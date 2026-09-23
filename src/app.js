@@ -719,7 +719,7 @@
     hiring: "Hiring signal", expansion: "Expansion signal", investment: "Planned investment",
     growth: "10% job/payroll growth or at-risk retention", financing: "Can finance before reimbursement",
     targetIndustry: "JobsOhio target industry", engagement: "Engagement signal",
-    revenueEstimate: "Estimated revenue", email: "General email", phone: "Main phone", instagram: "Instagram", facebook: "Facebook", x: "X (Twitter)",
+    revenueEstimate: "Estimated revenue", email: "Email", phone: "Phone", instagram: "Instagram", facebook: "Facebook", x: "X (Twitter)",
     youtube: "YouTube", tiktok: "TikTok",
     ownerIdentity: "Founder identity (self-reported or public)"
   };
@@ -895,10 +895,19 @@
 
     /* facts */
     h += '<div class="block"><h3>Profile and evidence</h3><div class="facts">';
+    var reach = LD.reachOf(c, cts);
     FACT_ORDER.forEach(function (k) {
       var f = c.f[k];
       h += '<div class="k">' + esc(FIELD_LABELS[k]) + '</div><div class="v">';
       if (editing === k) h += editor(k, f);
+      else if ((k === "email" || k === "phone") && reach[k]) {
+        /* the best way to reach them, wherever it is stored: a person's own
+           business email or phone, or the company's general one */
+        var r = reach[k];
+        var whose = r.who === "Main office" ? "Company's general " + (k === "email" ? "inbox" : "line") : (r.who + (r.role ? ", " + r.role : ""));
+        h += '<span class="mono">' + esc(r.v) + "</span>" + '<span class="prov">' + esc(whose) + " · " + (r.src && r.src !== "Researcher" ? link(r.src) : "researcher") + " · verified " + fmtDate(r.at) + "</span>" +
+          '<button type="button" class="edit-btn" data-act="edit" data-field="' + k + '">' + (r.who === "Main office" ? "Edit" : "Add a general " + (k === "email" ? "inbox" : "line")) + "</button>";
+      }
       else h += "<span>" + factValue(k, f) + "</span>" + provenance(f) + '<button type="button" class="edit-btn" data-act="edit" data-field="' + k + '">' + (f && !LD.blank(f.v) ? "Edit" : "Add") + "</button>";
       h += "</div>";
     });
