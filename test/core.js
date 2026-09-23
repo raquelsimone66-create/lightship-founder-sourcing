@@ -361,4 +361,25 @@ t('past grant recipients are flagged on the checklist, matched by name and metro
   LD.setRecipients([]);
 });
 
+t('under $100K is "not yet": no cap, clearly labelled', () => {
+  const c = LD.fromRaw({ name: 'Early Co', foundedYear: 2022, revenue: '$40K', industry: 'Software', targetIndustry: 'yes', customerMix: 'B2B' }, null, NOW).company;
+  const pre = LD.grantPrescreen(c, NOW);
+  assert.strictEqual(pre.outcome, 'Not yet (under $100K)');
+  const g = LD.grantLikelihood(c, NOW);
+  assert.ok(!g.hardNo);
+  assert.strictEqual(g.parts.find(p => p.key === 'revenue').points, 0);
+  assert.ok(g.score > 15, 'not capped: ' + g.score);
+  assert.ok(LD.underHundredK(c));
+  const est = LD.fromRaw({ name: 'Est Early', revenueEstimate: '$50K' }, null, NOW).company;
+  assert.ok(LD.underHundredK(est));
+});
+
+t('Bootcamp alumni match by domain, or by name in the same metro', () => {
+  LD.setAlumni([{ name: 'Clean Age', website: 'https://cleanage.example', city: 'Cincinnati', year: '2023' }]);
+  assert.ok(LD.bootcampAlum(LD.fromRaw({ name: 'Other Name', website: 'cleanage.example' }, null, NOW).company));
+  assert.ok(LD.bootcampAlum(LD.fromRaw({ name: 'Clean Age LLC', city: 'Norwood' }, null, NOW).company));
+  assert.strictEqual(LD.bootcampAlum(LD.fromRaw({ name: 'Clean Age', city: 'Toledo' }, null, NOW).company), null);
+  LD.setAlumni([]);
+});
+
 console.log('\n' + n + ' passed');

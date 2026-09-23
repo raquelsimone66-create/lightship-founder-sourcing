@@ -86,6 +86,8 @@
 
   function loadRecipients() {
     if (!window.fetch) return;
+    fetch("bootcamp-alumni.json").then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (list) { LD.setAlumni(list); schedule(); }).catch(function () { /* optional */ });
     fetch("josb-recipients.json").then(function (r) { return r.ok ? r.json() : []; })
       .then(function (list) { LD.setRecipients(list); schedule(); }).catch(function () { /* list is optional */ });
   }
@@ -348,7 +350,9 @@
       "<span>" + esc(who) + "</span></div>" +
       '<div class="lead-meta">' + reachLine(c) + "</div>" +
       '<div class="lead-meta">' + profileLinks(c) + "</div></div>" +
-      '<div class="lead-tags">' + reviewChip(c) + (LD.pastRecipient(c) ? '<span class="chip warn" title="On JobsOhio\'s all-time Small Business Grant recipient list">Past JOSB recipient</span>' : "") + LD.ownershipOf(c).map(function (id) { var o = LD.OWNERSHIP.filter(function (x) { return x.id === id; })[0]; return '<span class="chip lamp" title="As stated by: ' + esc((c.f.ownerIdentity && c.f.ownerIdentity.src) || "") + '">' + esc(o.label) + "</span>"; }).join("") + fitChip(c) + flagChips(c, ["conflict", "no-contact", "sync-error", "do-not-contact"]) + outreachChip(c) + "</div></li>";
+      '<div class="lead-tags">' + reviewChip(c) + (LD.pastRecipient(c) ? '<span class="chip warn" title="On JobsOhio\'s all-time Small Business Grant recipient list">Past JOSB recipient</span>' : "") +
+        (function () { var a = LD.bootcampAlum(c); return a ? '<span class="chip good" title="Already completed Lightship Bootcamp">Bootcamp alum' + (a.year ? " " + esc(a.year) : "") + "</span>" : ""; })() +
+        (LD.underHundredK(c) ? '<span class="chip" title="Revenue under $100K (stated or estimated) — not grant-eligible yet">Under $100K</span>' : "") + LD.ownershipOf(c).map(function (id) { var o = LD.OWNERSHIP.filter(function (x) { return x.id === id; })[0]; return '<span class="chip lamp" title="As stated by: ' + esc((c.f.ownerIdentity && c.f.ownerIdentity.src) || "") + '">' + esc(o.label) + "</span>"; }).join("") + fitChip(c) + flagChips(c, ["conflict", "no-contact", "sync-error", "do-not-contact"]) + outreachChip(c) + "</div></li>";
   }
 
   /* ============================================================
@@ -535,7 +539,7 @@
       '<label class="field">Review' + sel("f-review", "review", [["", "Any"], ["new", "New"], ["refreshed", "Refreshed"], ["investigate", "Investigate"], ["approved", "Approved"], ["rejected", "Rejected"]]) + "</label>" +
       '<label class="field">Minimum grant likelihood<input type="number" id="f-min" data-filter="minScore" min="0" max="100" step="5" value="' + esc(filters.minScore) + '"></label>' +
       '<label class="field">Customers' + sel("f-mix", "mix", [["", "Any"], ["B2B", "B2B"], ["Mixed", "Mixed"], ["B2C", "B2C"], ["Unknown", "Unknown"]]) + "</label>" +
-      '<label class="field">Grant pre-screen' + sel("f-grant", "grant", [["", "Any"], ["Potential referral", "Potential referral"], ["Needs review", "Needs review"], ["Unlikely fit", "Unlikely fit"]]) + "</label>" +
+      '<label class="field">Grant pre-screen' + sel("f-grant", "grant", [["", "Any"], ["Potential referral", "Potential referral"], ["Needs review", "Needs review"], ["Not yet (under $100K)", "Not yet (under $100K)"], ["Unlikely fit", "Unlikely fit"]]) + "</label>" +
       '<label class="field">Contact' + sel("f-contact", "contact", [["", "Any"], ["email", "Has an email"], ["noemail", "No email yet"], ["phone", "Has a phone"], ["verified", "Verified decision maker"], ["any", "Has a contact"], ["none", "No contact"]]) + "</label>" +
       '<label class="field">Company age' + sel("f-age", "age", [["", "Any"], ["known", "Evidence found"], ["unknown", "Unknown"]]) + "</label>" +
       '<label class="field">Revenue (stated or estimated)' + sel("f-rev", "revenue", [["", "Any"]].concat(LD.REVENUE_BANDS.filter(function (b) { return !b.legacy; }).map(function (b) { return [b.id, b.label]; })).concat([["unknown", "Unknown"]])) + "</label>" +
@@ -974,7 +978,7 @@
             return '<button type="button" class="' + (a === "yes" ? "no" : a === "no" ? "yes" : a) + '" aria-pressed="' + (pc === a) + '" data-act="tri" data-field="parentOver25M" data-v="' + a + '" title="Parent company at or above $25M?">' + (a === "yes" ? "Parent ≥$25M" : a === "no" ? "No big parent" : "?") + "</button>";
           }).join("") + "</span>";
         } else {
-          ctl = '<span class="chip ' + (it.answer === "yes" ? "good" : it.answer === "no" ? "alert" : "") + '">' + (it.answer === "yes" ? "Yes" : it.answer === "no" ? "No" : "Unknown") + "</span>";
+          ctl = '<span class="chip ' + (it.answer === "yes" ? "good" : it.answer === "no" ? "alert" : it.answer === "notyet" ? "warn" : "") + '">' + (it.answer === "yes" ? "Yes" : it.answer === "no" ? "No" : it.answer === "notyet" ? "Not yet" : "Unknown") + "</span>";
         }
         return '<div class="check"><div><div>' + esc(it.label) + '</div><div class="muted small">' + esc(it.why) + "</div></div>" + ctl + "</div>";
       }).join("") + "</div>" +

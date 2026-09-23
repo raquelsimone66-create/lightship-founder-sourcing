@@ -714,7 +714,7 @@
     var rev = val(c, "revenueBand"), parent = val(c, "parentOver25M");
     var est = val(c, "revenueEstimate");
     var revAns = "unknown", revWhy = est ? "Estimated " + bandLabel(est) + " — not confirmed" : "Revenue unknown";
-    if (rev === "lt100k") { revAns = "no"; revWhy = "Under $100K"; }
+    if (rev === "lt100k") { revAns = "notyet"; revWhy = "Under $100K — not eligible yet; a Bootcamp prospect that can grow into it"; }
     else if (rev === "gte25m" || parent === "yes") { revAns = "no"; revWhy = parent === "yes" ? "Parent company at or above $25M" : "$25M or more"; }
     else if (rev) { revAns = parent === "no" ? "yes" : "unknown"; revWhy = bandLabel(rev) + (parent === "no" ? ", no large parent" : "; parent-company revenue not confirmed"); }
     item("revenue", "Revenue $100K to under $25M, parent included", revAns, revWhy);
@@ -749,8 +749,11 @@
       why: "On JobsOhio's all-time recipient list (" + prior.name + ", " + prior.city + ") — check whether a second award is allowed" });
     var no = items.filter(function (x) { return x.answer === "no"; }).length;
     var yes = items.filter(function (x) { return x.answer === "yes"; }).length;
-    var outcome = no ? "Unlikely fit" : yes === items.length ? "Potential referral" : "Needs review";
-    return { outcome: outcome, items: items, yes: yes, no: no, unknown: items.length - yes - no };
+    /* under $100K is "not yet", not "no": most Bootcamp companies start
+       there, and the grant is something they grow into */
+    var notYet = items.some(function (x) { return x.answer === "notyet"; });
+    var outcome = no ? "Unlikely fit" : notYet ? "Not yet (under $100K)" : yes === items.length ? "Potential referral" : "Needs review";
+    return { outcome: outcome, items: items, yes: yes, no: no, notYet: notYet, unknown: items.length - yes - no };
   }
 
   /* How likely we could get this company the grant, 0–100. The same seven
@@ -769,6 +772,7 @@
       var max = GRANT_WEIGHTS[key];
       var it = byKey[key];
       if (it.answer === "no") { hardNo = true; points = 0; }
+      if (it.answer === "notyet") points = 0;
       if (known || it.answer !== "unknown") evidenced++;
       else missing.push(it.label);
       parts.push({ key: key, label: it.label, points: Math.min(max, points), max: max, answer: it.answer, why: why || it.why });
@@ -896,6 +900,38 @@
     return null;
   }
 
+  function underHundredK(c) {
+    return (val(c, "revenueBand") || val(c, "revenueEstimate")) === "lt100k";
+  }
+
+  /* Companies that have already been through Lightship Bootcamp, matched
+     by website domain, or by name in the same town or metro. */
+  var alumniIndex = null;
+  function setAlumni(list) {
+    alumniIndex = { byDomain: {}, byName: {} };
+    (list || []).forEach(function (a) {
+      var d = companyDomain(a.website);
+      if (d) alumniIndex.byDomain[d] = a;
+      var n = normName(a.name);
+      if (n) (alumniIndex.byName[n] = alumniIndex.byName[n] || []).push(a);
+    });
+  }
+  function bootcampAlum(c) {
+    if (!alumniIndex) return null;
+    var d = val(c, "domain");
+    if (d && alumniIndex.byDomain[d]) return alumniIndex.byDomain[d];
+    var names = [val(c, "name")].concat(c.aliases || []).map(normName).filter(Boolean);
+    var city = normCity(val(c, "city")), metro = regionOf(city);
+    for (var i = 0; i < names.length; i++) {
+      var hits = alumniIndex.byName[names[i]] || [];
+      for (var j = 0; j < hits.length; j++) {
+        var hc = normCity(hits[j].city);
+        if (!city || !hc || hc === city || (metro && regionOf(hc) === metro)) return hits[j];
+      }
+    }
+    return null;
+  }
+
   function revenueText(c) {
     var r = val(c, "revenueBand");
     if (r) return bandLabel(r);
@@ -980,7 +1016,7 @@
     out[AT_COMPANY.confidence] = s.confidence;
     out[AT_COMPANY.reasons] = reasons.join("\n");
     out[AT_COMPANY.grant] = g.outcome;
-    out[AT_COMPANY.checklist] = g.items.map(function (i) { return (i.answer === "yes" ? "✔ " : i.answer === "no" ? "✘ " : "? ") + i.label + " — " + i.why; }).join("\n");
+    out[AT_COMPANY.checklist] = g.items.map(function (i) { return (i.answer === "yes" ? "✔ " : i.answer === "no" ? "✘ " : i.answer === "notyet" ? "◷ Not yet: " : "? ") + i.label + " — " + i.why; }).join("\n");
     out[AT_COMPANY.sources] = (c.sources || []).map(function (x) { return (x.label ? x.label + ": " : "") + x.url + (x.at ? " (" + x.at + ")" : ""); }).join("\n");
     out[AT_COMPANY.discovered] = c.createdAt || null;
     out[AT_COMPANY.verified] = c.verifiedAt || null;
@@ -1146,7 +1182,7 @@
     isDecisionRole: isDecisionRole, mergeFacts: mergeFacts, mergeCompany: mergeCompany,
     contactMatch: contactMatch, ingest: ingest, suppressed: suppressed, inOutreach: inOutreach,
     scoreBootcamp: scoreBootcamp, grantPrescreen: grantPrescreen, grantLikelihood: grantLikelihood,
-    GRANT_WEIGHTS: GRANT_WEIGHTS, SOCIALS: SOCIALS, normSocial: normSocial, revenueText: revenueText, setRecipients: setRecipients, pastRecipient: pastRecipient, revenueMatches: revenueMatches, OWNERSHIP: OWNERSHIP, ownershipOf: ownershipOf, socialsOf: socialsOf, reachOf: reachOf, industryMatch: industryMatch,
+    GRANT_WEIGHTS: GRANT_WEIGHTS, SOCIALS: SOCIALS, normSocial: normSocial, revenueText: revenueText, underHundredK: underHundredK, setAlumni: setAlumni, bootcampAlum: bootcampAlum, setRecipients: setRecipients, pastRecipient: pastRecipient, revenueMatches: revenueMatches, OWNERSHIP: OWNERSHIP, ownershipOf: ownershipOf, socialsOf: socialsOf, reachOf: reachOf, industryMatch: industryMatch,
     bestContact: bestContact, flags: flags, companyToAirtable: companyToAirtable,
     contactToAirtable: contactToAirtable, outreachFromAirtable: outreachFromAirtable,
     metrics: metrics, weekStart: weekStart, parseCSV: parseCSV, clone: clone

@@ -12,6 +12,7 @@ You read and write its database with the ArtifactData tool. Load it with ToolSea
 - List the `companies` collection with `out_dir` set to a scratch folder. Build a set of every known domain (`f.domain.v`) and company name (`f.name.v`, plus `aliases`).
 - List the `intake` collection the same way and add its domains and names to that set.
 - Skip any candidate whose domain or name is already known. Don't spend research on a company the desk already has.
+- Also read /home/user/lightship-founder-sourcing/src/bootcamp-alumni.json (companies that have already completed Lightship Bootcamp: name, website, city, program, year) and don't add them: they've been through the program.
 - Also read /home/user/lightship-founder-sourcing/src/josb-recipients.json, JobsOhio's all-time list of Small Business Grant recipients (name, city, region). Don't add a company that is already on it: they've had the grant. Use the list the other way too — it shows the kinds of Ohio businesses JobsOhio funds (small machine, tool and fab shops, design and print firms, construction trades, food producers), so look for similar companies that aren't on it yet.
 
 ## 2. Where to look
@@ -25,7 +26,7 @@ Favor companies that match the grant:
 
 - **JobsOhio target industries:** advanced manufacturing, aerospace and aviation, automotive, energy and chemicals, financial services, food and agribusiness, healthcare and life sciences, logistics and distribution, technology and software, military and federal contracting.
 - **Primarily B2B:** they sell to other businesses, manufacturers, hospitals or government.
-- Operating at least 1 year, with roughly 2–100 employees and likely revenue of $100K to $25M.
+- Operating at least 1 year, with roughly 2–100 employees. Revenue of $100K to $25M makes them grant-ready now, but **companies under $100K are welcome too**: most Bootcamp companies start there. Aim for roughly two thirds already past $100K and up to a third under it, and mark them clearly — give a `revenueEstimate` such as "$25K-$75K" (the desk normalises it to "Under $100K") with its basis. The desk labels them "Not yet (under $100K)" rather than ruling them out.
 - **Growth signals:** hiring, a new location or equipment, contracts won, expansion news.
 
 Good public places to find them:

@@ -96,7 +96,7 @@ below, weighted:
 
 Unknown earns nothing. Each unknown is listed under *To confirm on a call or by
 research*, and together they set the confidence. Any clear **No**, such as
-revenue over $25M or under a year in business, caps the score at 15, because a
+revenue over $25M or under a year in business, caps the score at 15. Revenue under $100K isn't a No; it counts as "Not yet": the revenue points are 0 but the score isn't capped, because a
 company that fails a hard requirement shouldn't rank on the rest. A company
 like that can still be a Bootcamp prospect.
 
@@ -140,6 +140,12 @@ Sources: [program overview](https://www.jobsohio.com/incentives-programs/support
 reviewed September 23, 2026.
 
 ---
+
+## Reference lists
+
+- `src/josb-recipients.json` holds JobsOhio's all-time list of Small Business Grant recipients (682 companies, from a Sept 2026 export). Matching companies get a **Past JOSB recipient** tag and a line on their grant checklist. The weekly research skips them.
+- `src/bootcamp-alumni.json` holds companies that have completed Lightship Bootcamp (387). Matching companies get a **Bootcamp alum** tag, and the weekly research skips them. The file keeps company-level fields only: name, website, city, program and year. Founders' personal details from the intake form are not kept in this repo or on the page.
+- Of the alumni, only six had received the grant. 142 of the 148 who reported revenue were under $100K. That's why companies under $100K are included: they're tagged **Under $100K**, and their grant result reads **Not yet (under $100K)** instead of being ruled out.
 
 ## Founder representation
 
