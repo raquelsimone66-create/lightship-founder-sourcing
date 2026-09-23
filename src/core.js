@@ -34,6 +34,7 @@
     "brooklyn": "Cleveland", "brooklyn heights": "Cleveland", "north royalton": "Cleveland",
     "berea": "Cleveland", "wickliffe": "Cleveland", "eastlake": "Cleveland", "highland heights": "Cleveland",
     "mayfield heights": "Cleveland", "oakwood village": "Cleveland", "twinsburg": "Cleveland", "macedonia": "Cleveland",
+    "walton hills": "Cleveland", "seven hills": "Cleveland", "garfield hts": "Cleveland",
     akron: "Akron", "cuyahoga falls": "Akron", barberton: "Akron", stow: "Akron", kent: "Akron",
     hudson: "Akron", fairlawn: "Akron", "green": "Akron", tallmadge: "Akron", canton: "Akron",
     streetsboro: "Akron", ravenna: "Akron", "north canton": "Akron", massillon: "Akron", norton: "Akron",

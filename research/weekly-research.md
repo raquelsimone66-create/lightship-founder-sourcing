@@ -47,7 +47,7 @@ Rules for sources:
 
 ## 3. Research each company
 
-Visit the company's own site and at least one other source. Record only what you can point to.
+Visit the company's own site (home, about, team or leadership, contact and careers pages) and at least one other source. Where the website and a directory or search snippet disagree, trust the website and say so in `verifyNote`. If the site is dead or parked, or it shows the company closed, was acquired, is a subsidiary, is based outside Ohio, or has well over 100 employees, still include the company but explain it in `verifyNote`. The desk sends those companies to Investigate. Record only what you can point to.
 
 - `name`, `website`, `city` (the Ohio city where they operate), `industry` (plain words, e.g. "Precision CNC machining").
 - `description`: one plain sentence in your own words on what they do and for whom.
