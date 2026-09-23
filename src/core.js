@@ -68,7 +68,7 @@
     { id: "lt100k", label: "Under $100K" },
     { id: "100k-500k", label: "$100K–$500K" },
     { id: "500k-1m", label: "$500K–$1M" },
-    { id: "100k-1m", label: "$100K–$1M" },
+    { id: "100k-1m", label: "$100K–$1M", legacy: true },
     { id: "1m-5m", label: "$1M–$5M" },
     { id: "5m-25m", label: "$5M–$25M" },
     { id: "gte25m", label: "$25M or more" }
@@ -837,6 +837,33 @@
     return { email: pick("email"), phone: pick("phone") };
   }
 
+  /* Revenue as the filter sees it: the stated figure if there is one,
+     otherwise the estimate. The old $100K–$1M band spans the two finer
+     ones, so a filter on either finer band still finds it. */
+  function revenueMatches(c, band) {
+    var r = val(c, "revenueBand") || val(c, "revenueEstimate");
+    if (band === "unknown") return !r;
+    if (!r) return false;
+    if (r === band) return true;
+    if (r === "100k-1m") return band === "100k-500k" || band === "500k-1m";
+    if (band === "100k-1m") return r === "100k-500k" || r === "500k-1m";
+    return false;
+  }
+
+  /* Ownership, only as a source states it (a certification list or the
+     owner's own words). Never inferred, never scored. */
+  var OWNERSHIP = [
+    { id: "minority", label: "Minority-owned", re: /(minority|\bmbe\b|black|african[- ]american|hispanic|latin[oax]|asian|native american|indigenous|disadvantaged business|\bdbe\b)/i },
+    { id: "woman", label: "Woman-owned", re: /(wom[ae]n[- ]owned|\bwbe\b|\bfbe\b|female[- ]owned|woman[- ]led)/i },
+    { id: "veteran", label: "Veteran-owned", re: /(veteran|\bsdvosb\b|\bvosb\b)/i },
+    { id: "edge", label: "Ohio EDGE certified", re: /\bedge\b/i }
+  ];
+  function ownershipOf(c) {
+    var t = val(c, "ownerIdentity");
+    if (!t) return [];
+    return OWNERSHIP.filter(function (o) { return o.re.test(t); }).map(function (o) { return o.id; });
+  }
+
   function revenueText(c) {
     var r = val(c, "revenueBand");
     if (r) return bandLabel(r);
@@ -1087,7 +1114,7 @@
     isDecisionRole: isDecisionRole, mergeFacts: mergeFacts, mergeCompany: mergeCompany,
     contactMatch: contactMatch, ingest: ingest, suppressed: suppressed, inOutreach: inOutreach,
     scoreBootcamp: scoreBootcamp, grantPrescreen: grantPrescreen, grantLikelihood: grantLikelihood,
-    GRANT_WEIGHTS: GRANT_WEIGHTS, SOCIALS: SOCIALS, normSocial: normSocial, revenueText: revenueText, socialsOf: socialsOf, reachOf: reachOf, industryMatch: industryMatch,
+    GRANT_WEIGHTS: GRANT_WEIGHTS, SOCIALS: SOCIALS, normSocial: normSocial, revenueText: revenueText, revenueMatches: revenueMatches, OWNERSHIP: OWNERSHIP, ownershipOf: ownershipOf, socialsOf: socialsOf, reachOf: reachOf, industryMatch: industryMatch,
     bestContact: bestContact, flags: flags, companyToAirtable: companyToAirtable,
     contactToAirtable: contactToAirtable, outreachFromAirtable: outreachFromAirtable,
     metrics: metrics, weekStart: weekStart, parseCSV: parseCSV, clone: clone

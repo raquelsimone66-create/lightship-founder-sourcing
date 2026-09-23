@@ -174,7 +174,7 @@
      ============================================================ */
 
   var view = "today";
-  var filters = { q: "", region: "", mix: "", grant: "", contact: "", review: "", outreach: "", source: "", fresh: "", age: "", revenue: "", minScore: "", flag: "" };
+  var filters = { q: "", region: "", mix: "", grant: "", contact: "", review: "", outreach: "", source: "", fresh: "", age: "", revenue: "", minScore: "", flag: "", owner: "" };
   var sheet = null;          /* { kind: "company", id } | { kind: "import" } | { kind: "source", id } */
   var editing = null;        /* the inline edit currently open in the sheet */
   var perfPeriod = "week";
@@ -322,7 +322,7 @@
       "<span>" + esc(who) + "</span></div>" +
       '<div class="lead-meta">' + reachLine(c) + "</div>" +
       '<div class="lead-meta">' + profileLinks(c) + "</div></div>" +
-      '<div class="lead-tags">' + reviewChip(c) + fitChip(c) + flagChips(c, ["conflict", "no-contact", "sync-error", "do-not-contact"]) + outreachChip(c) + "</div></li>";
+      '<div class="lead-tags">' + reviewChip(c) + LD.ownershipOf(c).map(function (id) { var o = LD.OWNERSHIP.filter(function (x) { return x.id === id; })[0]; return '<span class="chip lamp" title="As stated by: ' + esc((c.f.ownerIdentity && c.f.ownerIdentity.src) || "") + '">' + esc(o.label) + "</span>"; }).join("") + fitChip(c) + flagChips(c, ["conflict", "no-contact", "sync-error", "do-not-contact"]) + outreachChip(c) + "</div></li>";
   }
 
   /* ============================================================
@@ -429,7 +429,18 @@
         .concat(contactsOf(c.id).map(function (ct) { return LD.val(ct, "name"); })).join(" ").toLowerCase();
       if (hay.indexOf(q) < 0) return false;
     }
-    if (f.region && regionOf(c) !== f.region) return false;
+    if (f.region) {
+      if (f.region.indexOf("c:") === 0) { if (LD.normCity(LD.val(c, "city")) !== f.region.slice(2)) return false; }
+      else if (regionOf(c) !== f.region.replace(/^r:/, "")) return false;
+    }
+    if (f.owner) {
+      var own = LD.ownershipOf(c);
+      var net = (c.sources || []).some(function (x) { return x.network; });
+      if (f.owner === "any" && !own.length) return false;
+      if (f.owner === "network" && !net) return false;
+      if (f.owner === "none" && own.length) return false;
+      if (["any", "network", "none"].indexOf(f.owner) < 0 && own.indexOf(f.owner) < 0) return false;
+    }
     if (f.mix && (LD.val(c, "customerMix") || "Unknown") !== f.mix) return false;
     if (f.grant && grantOf(c).outcome !== f.grant) return false;
     if (f.review) {
@@ -439,8 +450,7 @@
     if (f.minScore && likeOf(c).score < Number(f.minScore)) return false;
     if (f.age === "known" && !LD.val(c, "foundedYear")) return false;
     if (f.age === "unknown" && LD.val(c, "foundedYear")) return false;
-    if (f.revenue === "unknown" && LD.val(c, "revenueBand")) return false;
-    if (f.revenue && f.revenue !== "unknown" && LD.val(c, "revenueBand") !== f.revenue) return false;
+    if (f.revenue && !LD.revenueMatches(c, f.revenue)) return false;
     if (f.contact) {
       var ct = LD.bestContact(contactsOf(c.id), NOW());
       var reach = scoreOf(c).parts.reach;
@@ -480,8 +490,11 @@
   }
 
   function viewCompanies() {
-    var regions = {};
-    cache.companies.forEach(function (c) { var r = regionOf(c); if (r) regions[r] = 1; });
+    /* every Bootcamp metro, always, then each town we actually have */
+    var metros = LD.PRIORITY_CITIES.concat(LD.EXPANSION_CITIES);
+    var towns = {};
+    cache.companies.forEach(function (c) { var t = LD.normCity(LD.val(c, "city")); if (t) towns[t] = (towns[t] || 0) + 1; });
+    function metroCount(m) { return cache.companies.filter(function (c) { return regionOf(c) === m; }).length; }
     var rows = cache.companies.filter(matchesFilters).sort(function (a, b) { return likeOf(b).score - likeOf(a).score; });
     var flagLabel = { queue: "In the review queue", changes: "High-priority changes" };
     Object.keys(FLAG_TEXT).forEach(function (k) { flagLabel[k] = FLAG_TEXT[k][1]; });
@@ -489,14 +502,17 @@
     var html = '<div class="view-head"><div><h2>Companies</h2><p>Every company researched so far, ranked by grant likelihood. Scores recalculate whenever a fact changes.</p></div></div>';
     html += '<div class="filters">' +
       '<label class="field">Search<input type="search" id="f-q" data-filter="q" value="' + esc(filters.q) + '" placeholder="Name, domain, person, industry"></label>' +
-      '<label class="field">City' + sel("f-region", "region", [["", "All cities"]].concat(Object.keys(regions).sort().map(function (r) { return [r, r]; }))) + "</label>" +
+      '<label class="field">City<select id="f-region" data-filter="region">' + opt("", "All cities", filters.region) +
+        '<optgroup label="Metro areas">' + metros.map(function (m) { return opt("r:" + m, m + " area (" + metroCount(m) + ")", filters.region); }).join("") + "</optgroup>" +
+        '<optgroup label="Cities">' + Object.keys(towns).sort().map(function (t) { return opt("c:" + t, t + " (" + towns[t] + ")", filters.region); }).join("") + "</optgroup></select></label>" +
+      '<label class="field">Ownership' + sel("f-owner", "owner", [["", "Any"]].concat(LD.OWNERSHIP.map(function (o) { return [o.id, o.label]; })).concat([["any", "Any stated ownership"], ["network", "Found via a founder network"], ["none", "Not stated"]])) + "</label>" +
       '<label class="field">Review' + sel("f-review", "review", [["", "Any"], ["new", "New"], ["refreshed", "Refreshed"], ["investigate", "Investigate"], ["approved", "Approved"], ["rejected", "Rejected"]]) + "</label>" +
       '<label class="field">Minimum grant likelihood<input type="number" id="f-min" data-filter="minScore" min="0" max="100" step="5" value="' + esc(filters.minScore) + '"></label>' +
       '<label class="field">Customers' + sel("f-mix", "mix", [["", "Any"], ["B2B", "B2B"], ["Mixed", "Mixed"], ["B2C", "B2C"], ["Unknown", "Unknown"]]) + "</label>" +
       '<label class="field">Grant pre-screen' + sel("f-grant", "grant", [["", "Any"], ["Potential referral", "Potential referral"], ["Needs review", "Needs review"], ["Unlikely fit", "Unlikely fit"]]) + "</label>" +
       '<label class="field">Contact' + sel("f-contact", "contact", [["", "Any"], ["email", "Has an email"], ["noemail", "No email yet"], ["phone", "Has a phone"], ["verified", "Verified decision maker"], ["any", "Has a contact"], ["none", "No contact"]]) + "</label>" +
       '<label class="field">Company age' + sel("f-age", "age", [["", "Any"], ["known", "Evidence found"], ["unknown", "Unknown"]]) + "</label>" +
-      '<label class="field">Revenue' + sel("f-rev", "revenue", [["", "Any"], ["unknown", "Unknown"]].concat(LD.REVENUE_BANDS.map(function (b) { return [b.id, b.label]; }))) + "</label>" +
+      '<label class="field">Revenue (stated or estimated)' + sel("f-rev", "revenue", [["", "Any"]].concat(LD.REVENUE_BANDS.filter(function (b) { return !b.legacy; }).map(function (b) { return [b.id, b.label]; })).concat([["unknown", "Unknown"]])) + "</label>" +
       '<label class="field">Source' + sel("f-src", "source", [["", "Any"]].concat(cache.sources.map(function (s) { return [s.id, s.name]; })).concat(LD.SOURCE_TYPES.map(function (t) { return [t, "Type: " + t]; }))) + "</label>" +
       '<label class="field">Freshness' + sel("f-fresh", "fresh", [["", "Any"], ["fresh", "Fresh"], ["stale", "Stale"]]) + "</label>" +
       '<label class="field">Outreach' + sel("f-out", "outreach", [["", "Any"], ["Not in Airtable", "Not in Airtable"], ["Not started", "Not started"], ["Contacted", "Contacted"], ["Replied", "Replied"], ["Applied", "Applied"], ["Attended", "Attended"], ["Not interested", "Not interested"], ["Opted out", "Opted out"]]) + "</label>" +

@@ -324,4 +324,21 @@ t('best email and phone: decision maker first, then a general inbox', () => {
   assert.strictEqual(out['Phone'], '(216) 555-0100');
 });
 
+t('revenue filter matches estimates and overlapping bands', () => {
+  const a = LD.fromRaw({ name: 'A', revenueEstimate: '$600K-$900K' }, null, NOW).company;
+  assert.ok(LD.revenueMatches(a, '500k-1m'));
+  assert.ok(LD.revenueMatches(a, '100k-1m'));
+  assert.ok(!LD.revenueMatches(a, '1m-5m'));
+  const b = LD.fromRaw({ name: 'B' }, null, NOW).company;
+  assert.ok(LD.revenueMatches(b, 'unknown'));
+});
+
+t('ownership comes only from a stated source and maps to the filter', () => {
+  const c = LD.fromRaw({ name: 'C', ownerIdentity: 'City of Cleveland certified MBE', identitySource: 'https://city.example/mbe' }, null, NOW).company;
+  assert.deepStrictEqual(LD.ownershipOf(c), ['minority']);
+  const w = LD.fromRaw({ name: 'W', ownerIdentity: 'Certified WBE', identitySource: 'https://x.example' }, null, NOW).company;
+  assert.deepStrictEqual(LD.ownershipOf(w), ['woman']);
+  assert.deepStrictEqual(LD.ownershipOf(LD.fromRaw({ name: 'N' }, null, NOW).company), []);
+});
+
 console.log('\n' + n + ' passed');
