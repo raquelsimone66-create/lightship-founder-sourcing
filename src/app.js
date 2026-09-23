@@ -1293,7 +1293,15 @@
     if (code === "not_granted" || code === "approval_required") return "Allow Airtable for this page when asked.";
     if (code === "blocked_by_policy") return "Your organization's policy blocks Airtable here.";
     if (code === "server_unavailable") return "Airtable didn't answer in time. Some rows may have saved; sending again is safe.";
-    if (code === "tool_error") return String((e && e.message) || "Airtable refused the request").slice(0, 200);
+    if (code === "tool_error") {
+      var m = String((e && e.message) || "");
+      /* Airtable's wording when this connection can't see the base: it was
+         moved or deleted, or access to it wasn't granted when connecting */
+      if (/403|invalid permissions|model was not found|NOT_FOUND|not authorized/i.test(m)) {
+        return "Your Airtable connection can't open base " + settings().airtable.baseId + ". Reconnect Airtable at claude.ai/customize/connectors and grant access to that base, or set a different base in Settings → Airtable.";
+      }
+      return m.slice(0, 200) || "Airtable refused the request";
+    }
     return (e && e.message) || "Airtable request failed.";
   }
   function call(tool, input) {
