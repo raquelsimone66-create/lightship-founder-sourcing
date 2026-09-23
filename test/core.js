@@ -347,6 +347,7 @@ t('ownership comes only from a stated source and maps to the filter', () => {
   assert.deepStrictEqual(LD.ownershipOf(c), ['minority']);
   const w = LD.fromRaw({ name: 'W', ownerIdentity: 'Certified WBE', identitySource: 'https://x.example' }, null, NOW).company;
   assert.deepStrictEqual(LD.ownershipOf(w), ['woman']);
+  assert.deepStrictEqual(LD.ownershipOf(LD.fromRaw({ name: 'P', ownerIdentity: "WBENC-certified Women's Business Enterprise; SBA EDWOSB", identitySource: 'https://x.example' }, null, NOW).company), ['woman']);
   assert.deepStrictEqual(LD.ownershipOf(LD.fromRaw({ name: 'N' }, null, NOW).company), []);
 });
 

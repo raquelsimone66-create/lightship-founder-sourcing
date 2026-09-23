@@ -33,7 +33,7 @@
     "brook park": "Cleveland", "middleburg heights": "Cleveland", "cuyahoga heights": "Cleveland", "valley view": "Cleveland",
     "brooklyn": "Cleveland", "brooklyn heights": "Cleveland", "north royalton": "Cleveland",
     "berea": "Cleveland", "wickliffe": "Cleveland", "eastlake": "Cleveland", "highland heights": "Cleveland",
-    "mayfield heights": "Cleveland", "oakwood village": "Cleveland", "twinsburg": "Cleveland", "macedonia": "Cleveland",
+    "mayfield heights": "Cleveland", "mayfield": "Cleveland", "mayfield village": "Cleveland", "oakwood village": "Cleveland", "twinsburg": "Cleveland", "aurora": "Akron", "macedonia": "Cleveland",
     "walton hills": "Cleveland", "seven hills": "Cleveland", "garfield hts": "Cleveland",
     akron: "Akron", "cuyahoga falls": "Akron", barberton: "Akron", stow: "Akron", kent: "Akron",
     hudson: "Akron", fairlawn: "Akron", "green": "Akron", tallmadge: "Akron", canton: "Akron",
@@ -883,7 +883,7 @@
      owner's own words). Never inferred, never scored. */
   var OWNERSHIP = [
     { id: "minority", label: "Minority-owned", re: /(minority|\bmbe\b|black|african[- ]american|hispanic|latin[oax]|asian|native american|indigenous|disadvantaged business|\bdbe\b)/i },
-    { id: "woman", label: "Woman-owned", re: /(wom[ae]n[- ]owned|\bwbe\b|\bfbe\b|female[- ]owned|woman[- ]led)/i },
+    { id: "woman", label: "Woman-owned", re: /(wom[ae]n[- ]owned|wom[ae]n'?s business enterprise|\bwbe\b|\bfbe\b|\bwbenc\b|\b(ed)?wosb\b|female[- ]owned|wom[ae]n[- ]led)/i },
     { id: "veteran", label: "Veteran-owned", re: /(veteran|\bsdvosb\b|\bvosb\b)/i },
     { id: "edge", label: "Ohio EDGE certified", re: /\bedge\b/i }
   ];
