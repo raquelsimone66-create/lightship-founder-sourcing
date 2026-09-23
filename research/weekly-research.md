@@ -78,7 +78,7 @@ Write each company as one document in the `intake` collection with ArtifactData 
     "companyLinkedin": "", "instagram": "", "facebook": "", "x": "", "youtube": "", "tiktok": "",
     "hiring": "", "expansion": "", "investment": "", "engagement": "", "targetIndustry": "yes",
     "contactName": "", "contactRole": "", "email": "", "phone": "", "linkedin": "",
-    "sourceUrl": "", "evidence": { "hiring": "https://…" }
+    "sourceUrl": "", "evidence": { "hiring": "https://…" }, "verifyNote": ""
   }
 }
 ```

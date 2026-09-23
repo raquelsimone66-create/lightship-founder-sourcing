@@ -497,7 +497,13 @@
       company = incoming;
       company.id = stableId("co", companyKey(incoming));
       company.createdAt = today(now);
-      company.review = { state: sup ? "rejected" : "new", note: sup ? "Suppressed: " + sup : "" };
+      /* the researcher's own note on the company website decides whether
+         this starts in the queue or under Investigate */
+      var vnote = raw.verifyNote ? String(raw.verifyNote).slice(0, 300) : "";
+      var doubt = vnote && NEEDS_LOOK.test(vnote);
+      company.review = sup ? { state: "rejected", note: "Suppressed: " + sup }
+        : doubt ? { state: "investigate", note: "Research note: " + vnote }
+        : { state: "new", note: vnote ? "Research note: " + vnote : "" };
       action = sup ? "suppressed" : "created";
     }
     company.updatedAt = today(now);
@@ -526,6 +532,8 @@
 
     return { action: action, company: company, match: match ? match.why : null, changed: changed, contacts: contacts };
   }
+
+  var NEEDS_LOOK = /(for sale|parked|closed|out of business|acquired|bought by|subsidiary|outside ohio|out of state|michigan|pennsylvania|indiana|kentucky|out of range|too large|well over 100|venture|isn.t named|not named|mailbox)/i;
 
   function suppressed(c, list) {
     var d = val(c, "domain"), n = normName(val(c, "name"));

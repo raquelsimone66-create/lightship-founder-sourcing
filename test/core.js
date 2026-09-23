@@ -300,4 +300,12 @@ t('the same company added twice, from separate views, gets the same id', () => {
   assert.strictEqual(n1.company.id, n2.company.id);
 });
 
+t('a research note that doubts the company sends it to Investigate', () => {
+  const a = LD.ingest({ name: 'Gone Co', website: 'gone.example', verifyNote: 'Website redirects to a GoDaddy domain for sale page' }, null, { companies: [], contacts: [] }, NOW);
+  assert.strictEqual(a.company.review.state, 'investigate');
+  const b = LD.ingest({ name: 'Fine Co', website: 'fine.example', verifyNote: 'Site confirms Akron address and founding year' }, null, { companies: [], contacts: [] }, NOW);
+  assert.strictEqual(b.company.review.state, 'new');
+  assert.ok(/Research note/.test(b.company.review.note));
+});
+
 console.log('\n' + n + ' passed');
