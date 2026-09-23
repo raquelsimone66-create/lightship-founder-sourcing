@@ -1371,6 +1371,7 @@
   }
 
   var syncing = false;
+  var approverNames = {};
   function sync(companies) {
     if (syncing) return;
     companies = companies.filter(function (c) { return state(c) === "approved" && !c.doNotContact; });
@@ -1379,8 +1380,23 @@
     at.status = "busy"; at.msg = "Sending " + companies.length + " to Airtable…"; schedule();
     var errors = [];
     var s = settings();
-    loadSchema().then(function (sc) {
-      var rows = companies.map(function (c) { return { key: c.id, fields: LD.companyToAirtable(c, contactsOf(c.id), s, NOW()) }; });
+    /* Airtable gets the approver's name; the desk itself only keeps ids */
+    var approverIds = companies.map(function (c) { return c.review && c.review.by; }).filter(Boolean);
+    var namesReady = user && user.profiles && approverIds.length
+      ? user.profiles(approverIds).catch(function () { return {}; })
+      : Promise.resolve({});
+    namesReady.then(function (ps) {
+      approverNames = {};
+      Object.keys(ps || {}).forEach(function (id) { approverNames[id] = (ps[id] && ps[id].name) || ""; });
+      if (me && me.id && me.name) approverNames[me.id] = approverNames[me.id] || me.name;
+      return loadSchema();
+    }).then(function (sc) {
+      var rows = companies.map(function (c) {
+        var f = LD.companyToAirtable(c, contactsOf(c.id), s, NOW());
+        var by = c.review && c.review.by;
+        f[LD.AT_COMPANY.approvedBy] = (by && approverNames[by]) || null;
+        return { key: c.id, fields: f };
+      });
       return upsert(sc.companies, rows).then(function (res) {
         var nowIso = new Date().toISOString();
         var ok = [];
