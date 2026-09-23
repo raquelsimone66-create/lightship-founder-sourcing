@@ -350,3 +350,22 @@ ul.plain li { margin: 2px 0; }
   .sheet { animation: slide .18s ease-out; }
   @keyframes slide { from { transform: translateX(24px); opacity: .6; } to { transform: none; opacity: 1; } }
 }
+
+/* theme button: a drawn dot, so it never depends on a font having the glyph */
+.theme-dot { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid currentColor; display: inline-block; flex: none; }
+.theme-dot.theme-system { background: linear-gradient(90deg, currentColor 50%, transparent 50%); }
+.theme-dot.theme-light { background: transparent; }
+.theme-dot.theme-dark { background: currentColor; }
+
+/* company names shouldn't wrap to one word per line */
+table.data.companies td:nth-child(2) { min-width: 190px; }
+
+/* view-only teammates: hide the actions they can't take */
+.readonly [data-act="approve"], .readonly [data-act="reject"], .readonly [data-act="investigate"],
+.readonly [data-act="reopen"], .readonly [data-act="ack-refresh"], .readonly [data-act="sync"],
+.readonly [data-act="sync-one"], .readonly [data-act="readback"], .readonly [data-act="process-intake"],
+.readonly [data-act="open-import"], .readonly [data-act="open-source"], .readonly [data-act="edit"],
+.readonly [data-act="tri"], .readonly [data-act="toggle-dm"], .readonly [data-act="toggle-dnc"],
+.readonly [data-act="verify-method"], .readonly [data-act="resolve"], .readonly [data-act="clear-override"],
+.readonly [data-act="add-cohort"], .readonly [data-act="rm-cohort"], .readonly [data-act="save-cities"],
+.readonly [data-act="save-airtable"], .readonly [data-act="add-sup"], .readonly [data-act="rm-sup"] { display: none !important; }

@@ -146,6 +146,11 @@ const server = http.createServer((req, res) => {
   await page.click('[data-act="close"]');
   await page.click('[data-act="readback"]');
   await page.waitForFunction(() => /Outreach read/.test(document.getElementById('toast').textContent));
+  /* reading again with nothing changed in Airtable saves nothing */
+  await page.evaluate(() => { document.getElementById('toast').textContent = ''; });
+  await page.click('[data-act="readback"]');
+  await page.waitForFunction(() => /Outreach read/.test(document.getElementById('toast').textContent));
+  assert.ok(/0 updated/.test(await page.textContent('#toast')), 'second read changes nothing: ' + await page.textContent('#toast'));
   await page.click('[data-act="nav"][data-view="settings"]');
   const sup = await page.textContent('main');
   assert.ok(/Opted out in Airtable/.test(sup), 'opt-out joined the suppression list');

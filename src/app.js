@@ -69,14 +69,17 @@
 
   /* Theme: match system, light or dark. Remembered on this device only. */
   var THEMES = ["system", "light", "dark"];
-  var THEME_LABEL = { system: "◐ Match system", light: "☀ Light", dark: "☾ Dark" };
+  var THEME_LABEL = { system: "Match system", light: "Light", dark: "Dark" };
   var theme = "system";
   function applyTheme() {
     var root = document.documentElement;
     if (theme === "system") root.removeAttribute("data-theme");
     else root.setAttribute("data-theme", theme);
     var b = document.getElementById("btn-theme");
-    if (b) { b.textContent = THEME_LABEL[theme]; b.title = "Theme: " + THEME_LABEL[theme].slice(2) + " — click to change"; }
+    if (b) {
+      b.innerHTML = '<span class="theme-dot theme-' + theme + '" aria-hidden="true"></span>' + THEME_LABEL[theme];
+      b.title = "Theme: " + THEME_LABEL[theme] + " — click to change";
+    }
   }
   function cycleTheme() {
     theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
@@ -103,11 +106,12 @@
     window.claude.use("db").then(function (h) {
       if (!h) return;
       db = h; mode = "db";
-      var pending = COLLS.length;
+      var loaded = {};
       COLLS.forEach(function (c) {
         db.collection(c).onSnapshot(function (snap) {
           cache[c] = snap.docs.map(function (d) { return Object.assign({}, d.data() || {}, { id: d.id }); });
-          if (pending > 0 && --pending === 0) afterLoad();
+          loaded[c] = true;
+          if (COLLS.every(function (k) { return loaded[k]; })) afterLoad();
           schedule();
         }, function (err) { console.warn("snapshot error", c, err && err.code); });
       });
@@ -116,7 +120,11 @@
     window.claude.use("user").then(function (u) {
       if (!u) return;
       user = u;
-      u.me().then(function (m) { me = m; maybeAutoIntake(); schedule(); });
+      u.me().then(function (m) {
+        me = m;
+        document.documentElement.classList.toggle("readonly", m && m.canEdit === false);
+        maybeAutoIntake(); maybeReadBack(); schedule();
+      }).catch(function () { /* no identity: stay as is */ });
     }).catch(function () {});
   }
 
@@ -125,9 +133,17 @@
     if (loadedOnce) return;
     loadedOnce = true;
     maybeAutoIntake();
-    /* one quiet read of outreach state per visit, so opt-outs and replies
-       made in Airtable are here before anyone reviews */
-    if (settings().airtable.baseId) readBack(true);
+    maybeReadBack();
+  }
+
+  /* one quiet read of outreach state per visit, so opt-outs and replies made
+     in Airtable are here before anyone reviews — only for people who can
+     edit, since the read saves what it finds */
+  var readBackDone = false;
+  function maybeReadBack() {
+    if (readBackDone || !loadedOnce || !me || !me.canEdit || !settings().airtable.baseId) return;
+    readBackDone = true;
+    readBack(true);
   }
 
   /* Claude's research lands in intake; the first person who can edit and
@@ -214,7 +230,21 @@
     (window.requestAnimationFrame || setTimeout)(function () { queued = false; render(); });
   }
 
+  /* A redraw while someone is typing in a form would wipe what they typed,
+     so it waits until they leave the field. Filters redraw themselves. */
+  var deferred = false;
+  function typingInForm() {
+    var a = document.activeElement;
+    if (!a || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return false;
+    if (a.getAttribute("data-filter")) return false;
+    return !!(a.closest && (a.closest("#sheet") || a.closest("#main")));
+  }
+  document.addEventListener("focusout", function () {
+    setTimeout(function () { if (deferred && !typingInForm()) { deferred = false; render(); } }, 0);
+  });
+
   function render() {
+    if (typingInForm()) { deferred = true; renderTabs(); renderStatus(); return; }
     memo = { score: {}, grant: {}, like: {} };
     renderTabs();
     renderStatus();
@@ -553,7 +583,7 @@
     html += '<p class="muted small">' + rows.length + " of " + cache.companies.length + " companies" + (rows.length > 300 ? " · showing the top 300 by score" : "") + "</p>";
     if (!rows.length) return html + '<div class="panel empty">No companies match these filters.</div>';
 
-    html += '<div class="table-wrap"><table class="data"><thead><tr><th>Grant likelihood</th><th>Company</th><th>Industry</th><th>Revenue</th><th>City</th><th>Owner</th><th>Email</th><th>Phone</th><th>Online</th><th>Bootcamp fit</th><th>Review</th><th>Outreach</th></tr></thead><tbody>';
+    html += '<div class="table-wrap"><table class="data companies"><thead><tr><th>Grant likelihood</th><th>Company</th><th>Industry</th><th>Revenue</th><th>City</th><th>Owner</th><th>Email</th><th>Phone</th><th>Online</th><th>Bootcamp fit</th><th>Review</th><th>Outreach</th></tr></thead><tbody>';
     rows.slice(0, 300).forEach(function (c) {
       var g = likeOf(c), s = scoreOf(c);
       var ct = LD.bestContact(contactsOf(c.id), NOW());
@@ -739,7 +769,7 @@
       '<p class="muted small" style="margin:0 0 10px">Opt-outs from Airtable land here automatically. A suppressed company is never queued again, even if a new source lists it.</p>' +
       '<div class="row" style="margin-bottom:10px"><input type="text" id="sup-v" placeholder="domain.com or company name" style="flex:1;min-width:0"><button type="button" class="btn sm" data-act="add-sup">Add</button></div>';
     html += s.suppression.length ? '<ul class="plain" style="margin:0;max-height:320px;overflow:auto">' + s.suppression.map(function (x, i) {
-      return "<li>" + esc(x.domain || x.name) + ' <span class="muted small">' + esc(x.reason || "") + (x.at ? " · " + fmtDate(x.at) : "") + '</span> <button type="button" class="btn ghost sm" data-act="rm-sup" data-i="' + i + '">Remove</button></li>';
+      return "<li>" + esc(x.domain || x.name) + ' <span class="muted small">' + esc(x.reason || "") + (x.at ? " · " + fmtDate(x.at) : "") + '</span> <button type="button" class="btn ghost sm" data-act="rm-sup" data-key="' + esc(x.domain || x.name) + '">Remove</button></li>';
     }).join("") + "</ul>" : "";
     html += "</div>";
 
@@ -781,6 +811,7 @@
   }
 
   function renderSheet() {
+    if (!sheet) return;
     var el = document.getElementById("sheet");
     var html = "";
     if (sheet.kind === "company") html = sheetCompany(find("companies", sheet.id));
@@ -1070,7 +1101,8 @@
     "hiring", "expansion", "investment", "engagement", "ownerIdentity"];
 
   function runEnrich(c, url, text) {
-    enrich = { status: "busy", result: null, error: "" };
+    var forId = c.id;
+    enrich = { status: "busy", result: null, error: "", companyId: forId };
     renderSheetKeepEdit();
     sampleHandle().then(function (sample) {
       if (!sample) throw { code: "not_granted" };
@@ -1092,10 +1124,12 @@
         return { field: f.field, value: v, quote: String(f.quote || "").slice(0, 240) };
       }).filter(function (f) { return !LD.blank(f.value); });
       var contacts = (out && Array.isArray(out.contacts) ? out.contacts : []).filter(function (p) { return p && (p.name || p.email || p.phone); });
-      enrich = { status: "idle", result: { url: url, facts: facts, contacts: contacts }, error: "" };
+      if (enrich.companyId !== forId) return;          /* the researcher moved on */
+      enrich = { status: "idle", result: { url: url, facts: facts, contacts: contacts }, error: "", companyId: forId };
       renderSheetKeepEdit();
     }).catch(function (e) {
-      enrich = { status: "idle", result: null, error: sampleError(e) };
+      if (enrich.companyId !== forId) return;
+      enrich = { status: "idle", result: null, error: sampleError(e), companyId: forId };
       renderSheetKeepEdit();
     });
   }
@@ -1370,6 +1404,13 @@
     }, Promise.resolve()).then(function () { return { done: done, failed: failed }; });
   }
 
+  function sameShallow(a, b) {
+    a = a || {}; b = b || {};
+    var keys = Object.keys(a).concat(Object.keys(b));
+    for (var i = 0; i < keys.length; i++) if (a[keys[i]] !== b[keys[i]]) return false;
+    return true;
+  }
+
   var syncing = false;
   var approverNames = {};
   function sync(companies) {
@@ -1400,7 +1441,10 @@
       return upsert(sc.companies, rows).then(function (res) {
         var nowIso = new Date().toISOString();
         var ok = [];
-        companies.forEach(function (c) {
+        companies.forEach(function (c0) {
+          /* save onto the latest copy, not the one taken before the network
+             calls — a teammate's edit or an opt-out may have landed meanwhile */
+          var c = find("companies", c0.id) || c0;
           var copy = LD.clone(c);
           var a = copy.airtable || {};
           if (res.done[c.id]) {
@@ -1421,7 +1465,7 @@
         if (!ctRows.length) return ok.length;
         return upsert(sc.contacts, ctRows).then(function (r2) {
           ctRows.forEach(function (row) {
-            var ct = LD.clone(row.ct);
+            var ct = LD.clone(find("contacts", row.ct.id) || row.ct);
             if (r2.done[row.key]) ct.airtable = { recordId: r2.done[row.key], status: "synced", syncedAt: nowIso };
             else { ct.airtable = { status: "error", error: r2.failed[row.key] }; errors.push("Contact " + (LD.val(ct, "name") || ct.id) + ": " + r2.failed[row.key]); }
             put("contacts", ct);
@@ -1476,7 +1520,9 @@
             next.outreach = o;
             next.airtable = Object.assign({}, next.airtable || {}, { recordId: r.id });
             if (o.optedOut && !c.doNotContact) { next.doNotContact = true; logTo(next, "Opted out (from Airtable)"); optOuts++; }
-            if (JSON.stringify(next.outreach) !== JSON.stringify(c.outreach) || next.doNotContact !== c.doNotContact || (c.airtable || {}).recordId !== r.id) {
+            /* compare field by field: the store hands keys back in its own
+               order, so comparing JSON text saw a change on every read */
+            if (!sameShallow(next.outreach, c.outreach) || !!next.doNotContact !== !!c.doNotContact || (c.airtable || {}).recordId !== r.id) {
               put("companies", next); updated++;
             }
           } else outside++;
@@ -1527,7 +1573,7 @@
         var batch = bySource[sid][0] && bySource[sid][0].batch;
         /* the run id is the batch, so a second view adding the same batch
            overwrites the log line instead of doubling it */
-        commitResults(dryRun(rows, src ? srcRef(src) : RESEARCH_SOURCE), src, "Research batch" + (batch ? " " + batch : ""), "research");
+        commitResults(dryRun(rows, src ? srcRef(src) : RESEARCH_SOURCE), src, "Research batch " + (batch || LD.today()) + (src ? " · " + src.name : ""), "research");
       }
       bySource[sid].forEach(function (it) { if (usable.indexOf(it) >= 0) del("intake", it.id); });
       if (usable.length < bySource[sid].length && !auto) toast("Some candidates came from a paused source and were left waiting.");
@@ -1545,6 +1591,8 @@
     var next = LD.clone(c);
     fn(next);
     next.updatedAt = LD.today();
+    /* any change to a company already in Airtable queues an update */
+    if (next.airtable && next.airtable.recordId && next.airtable.status === "synced") next.airtable.status = "pending";
     if (what) logTo(next, what);
     put("companies", next);
   }
@@ -1628,7 +1676,7 @@
       case "sync-one": sync([find("companies", cid)]); break;
 
       /* facts */
-      case "edit": editing = d.field; if (d.field === "enrich") enrich = { status: "idle", result: null, error: "" }; renderSheetForce(); break;
+      case "edit": editing = d.field; if (d.field === "enrich") enrich = { status: "idle", result: null, error: "", companyId: cid }; renderSheetForce(); break;
       case "cancel-edit": editing = null; renderSheet(); break;
       case "save-fact":
         var val = v("ed-v"), src = v("ed-src");
@@ -1705,7 +1753,7 @@
         runEnrich(find("companies", cid), eu, et);
         break;
       case "accept-enrich":
-        var r = enrich.result; if (!r) break;
+        var r = enrich.result; if (!r || enrich.companyId !== cid) break;
         var took = 0;
         mutate(cid, function (c) {
           var inc = { f: {} };
@@ -1802,7 +1850,7 @@
         var dom = LD.companyDomain(sv);
         saveSettings({ suppression: settings().suppression.concat([{ domain: dom, name: dom ? "" : sv, reason: "Added by researcher", at: LD.today() }]) });
         break;
-      case "rm-sup": saveSettings({ suppression: settings().suppression.filter(function (x, i) { return i !== Number(d.i); }) }); break;
+      case "rm-sup": saveSettings({ suppression: settings().suppression.filter(function (x) { return (x.domain || x.name) !== d.key; }) }); break;
     }
   });
 

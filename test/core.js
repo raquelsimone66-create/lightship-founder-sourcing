@@ -160,7 +160,7 @@ t('stale contact verification drops reach points and flags the profile', () => {
 
 t('grant pre-screen: any No is unlikely fit; all Yes is a potential referral; else needs review', () => {
   const base = { name: 'Acme', city: 'Cleveland', foundedYear: 2018, revenue: '2,000,000', parentOver25M: 'no',
-    industry: 'Precision machining', customerMix: 'B2B', investment: 'New CNC line, $80K',
+    industry: 'Precision machining', targetIndustry: 'yes', customerMix: 'B2B', investment: 'New CNC line, $80K',
     growth: 'yes', financing: 'yes' };
   let c = LD.fromRaw(base, null, NOW).company;
   assert.strictEqual(LD.grantPrescreen(c, NOW).outcome, 'Potential referral');
@@ -380,6 +380,46 @@ t('Bootcamp alumni match by domain, or by name in the same metro', () => {
   assert.ok(LD.bootcampAlum(LD.fromRaw({ name: 'Clean Age LLC', city: 'Norwood' }, null, NOW).company));
   assert.strictEqual(LD.bootcampAlum(LD.fromRaw({ name: 'Clean Age', city: 'Toledo' }, null, NOW).company), null);
   LD.setAlumni([]);
+});
+
+t('review fixes: normalisers', () => {
+  assert.strictEqual(LD.normMix('B2C and B2B'), 'Mixed');
+  assert.strictEqual(LD.normMix('consumers and businesses'), 'Mixed');
+  assert.strictEqual(LD.normName('Acme L.L.C.'), LD.normName('Acme LLC'));
+  assert.strictEqual(LD.normCity('SANDUSKY'), 'Sandusky');
+  assert.strictEqual(LD.normEmail('mailto:Jo@Acme.com?subject=hi'), 'jo@acme.com');
+  assert.strictEqual(LD.normLinkedIn('https://ca.linkedin.com/in/jo'), 'https://www.linkedin.com/in/jo');
+  assert.strictEqual(LD.normSocial('@acmeco', 'youtube'), 'https://www.youtube.com/@acmeco');
+  assert.strictEqual(LD.normPhone('216-555-1234 ext 22'), '(216) 555-1234');
+});
+
+t('review fixes: industry keywords match whole words, and a guess is not a Yes', () => {
+  assert.strictEqual(LD.industryMatch('Thai restaurant'), '');
+  assert.strictEqual(LD.industryMatch('Topsoil delivery'), '');
+  assert.strictEqual(LD.industryMatch('Precision CNC machining'), 'Advanced Manufacturing');
+  const c = LD.fromRaw({ name: 'M', industry: 'Precision machining' }, null, NOW).company;
+  assert.strictEqual(LD.grantPrescreen(c, NOW).items.find(i => i.key === 'industry').answer, 'unknown');
+  assert.strictEqual(LD.grantLikelihood(c, NOW).parts.find(p => p.key === 'industry').points, 14);
+});
+
+t('review fixes: a domain match wins over an earlier name match', () => {
+  const a = LD.fromRaw({ name: 'Acme', city: 'Akron' }, null, NOW).company;
+  const b = LD.fromRaw({ name: 'Acme Fabrication', website: 'acme.com' }, null, NOW).company;
+  const m = LD.findMatch(LD.fromRaw({ name: 'Acme', website: 'acme.com', city: 'Akron' }, null, NOW).company, [a, b]);
+  assert.strictEqual(m.company, b);
+});
+
+t('review fixes: an estimate under $100K is Not yet with no revenue points', () => {
+  const e = LD.fromRaw({ name: 'E', revenueEstimate: '$25K-$75K' }, null, NOW).company;
+  assert.strictEqual(LD.grantPrescreen(e, NOW).outcome, 'Not yet (under $100K)');
+  assert.strictEqual(LD.grantLikelihood(e, NOW).parts.find(p => p.key === 'revenue').points, 0);
+});
+
+t('review fixes: a send never clears an opt-out made in Airtable', () => {
+  const c = Object.assign(LD.fromRaw({ name: 'X', website: 'x.example' }, null, NOW).company, { id: 'co_x' });
+  assert.ok(!('Do not contact' in LD.companyToAirtable(c, [], {}, NOW)));
+  c.doNotContact = true;
+  assert.strictEqual(LD.companyToAirtable(c, [], {}, NOW)['Do not contact'], true);
 });
 
 console.log('\n' + n + ' passed');

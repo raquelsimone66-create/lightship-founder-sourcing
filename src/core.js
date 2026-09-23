@@ -162,6 +162,7 @@
   var SUFFIXES = /\b(llc|l\.l\.c|inc|incorporated|co|company|corp|corporation|ltd|limited|pllc|plc|lp|llp|group|holdings|enterprises)\b\.?/g;
   function normName(raw) {
     return String(raw || "").toLowerCase()
+      .replace(/\.(?=\w)/g, "")
       .replace(/&/g, " and ")
       .replace(/['’`]/g, "")
       .replace(/[^a-z0-9 ]+/g, " ")
@@ -174,7 +175,7 @@
   function normCity(raw) {
     var s = String(raw || "").split(",")[0].trim();
     if (!s) return "";
-    return s.replace(/\s+/g, " ").replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+    return s.replace(/\s+/g, " ").toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); });
   }
   function regionOf(city) {
     var c = String(city || "").toLowerCase().split(",")[0].trim();
@@ -182,18 +183,18 @@
   }
 
   function normEmail(raw) {
-    var s = String(raw || "").trim().toLowerCase();
+    var s = String(raw || "").trim().toLowerCase().replace(/^mailto:/, "").split("?")[0];
     return /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(s) ? s : "";
   }
   function normPhone(raw) {
-    var d = String(raw || "").replace(/\D/g, "");
+    var d = String(raw || "").split(/\s*(?:ext\.?|extension|x|#)\s*\d+\s*$/i)[0].replace(/\D/g, "");
     if (d.length === 11 && d[0] === "1") d = d.slice(1);
     return d.length === 10 ? "(" + d.slice(0, 3) + ") " + d.slice(3, 6) + "-" + d.slice(6) : "";
   }
   function normLinkedIn(raw) {
     var s = String(raw || "").trim();
     if (!/linkedin\.com\//i.test(s)) return "";
-    return "https://www." + s.replace(/^[a-z]+:\/\//i, "").replace(/^www\./i, "").replace(/[?#].*$/, "").replace(/\/$/, "");
+    return "https://www." + s.replace(/^[a-z]+:\/\//i, "").replace(/^[a-z0-9-]+\.(?=linkedin\.com)/i, "").replace(/[?#].*$/, "").replace(/\/$/, "");
   }
 
   /* Public social profiles. A handle or a URL goes in; a clean URL comes out,
@@ -212,7 +213,7 @@
     if (!net) return "";
     if (/^@?[A-Za-z0-9._-]{2,40}$/.test(s)) {
       var h = s.replace(/^@/, "");
-      return "https://www." + net.host + "/" + (key === "tiktok" ? "@" : "") + h;
+      return "https://www." + net.host + "/" + (key === "tiktok" || key === "youtube" ? "@" : "") + h;
     }
     var d = normDomain(s);
     if (d !== net.host && d !== net.alt && d.slice(-(net.host.length + 1)) !== "." + net.host) return "";
@@ -245,6 +246,11 @@
   }
 
   function findMatch(candidate, companies) {
+    /* a shared domain beats a shared name, wherever it sits in the list */
+    var d = val(candidate, "domain");
+    if (d) for (var k = 0; k < companies.length; k++) {
+      if (val(companies[k], "domain") === d) return { company: companies[k], why: "domain" };
+    }
     for (var i = 0; i < companies.length; i++) {
       var why = matchReason(candidate, companies[i]);
       if (why) return { company: companies[i], why: why };
@@ -353,9 +359,10 @@
   function normMix(v) {
     var s = String(v || "").toLowerCase();
     if (!s) return "";
-    if (/mix|both|b2b\s*\/\s*b2c|b2b and b2c/.test(s)) return "Mixed";
-    if (/b2b|business/.test(s)) return "B2B";
-    if (/b2c|consumer|retail/.test(s)) return "B2C";
+    var biz = /b2b|business/.test(s), con = /b2c|consumer|retail/.test(s);
+    if (/mix|both/.test(s) || (biz && con)) return "Mixed";
+    if (biz) return "B2B";
+    if (con) return "B2C";
     return "";
   }
   function normTri(v) {
@@ -690,11 +697,22 @@
     return best;
   }
 
+  /* Keywords match at word starts; short ones ("ai", "oil", "tech") only
+     as whole words, so "Thai restaurant" is not technology and "topsoil"
+     is not energy. */
+  var industryRes = null;
   function industryMatch(industry, description) {
-    var hay = " " + String(industry || "").toLowerCase() + " " + String(description || "").toLowerCase() + " ";
-    for (var i = 0; i < JOBSOHIO_INDUSTRIES.length; i++) {
-      var ind = JOBSOHIO_INDUSTRIES[i];
-      for (var j = 0; j < ind.kw.length; j++) if (hay.indexOf(ind.kw[j]) >= 0) return ind.name;
+    if (!industryRes) {
+      industryRes = JOBSOHIO_INDUSTRIES.map(function (ind) {
+        return { name: ind.name, res: ind.kw.map(function (k) {
+          var w = k.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          return new RegExp("\\b" + w + (w.length <= 4 ? "\\b" : ""), "i");
+        }) };
+      });
+    }
+    var hay = String(industry || "") + " " + String(description || "");
+    for (var i = 0; i < industryRes.length; i++) {
+      for (var j = 0; j < industryRes[i].res.length; j++) if (industryRes[i].res[j].test(hay)) return industryRes[i].name;
     }
     return "";
   }
@@ -714,7 +732,7 @@
     var rev = val(c, "revenueBand"), parent = val(c, "parentOver25M");
     var est = val(c, "revenueEstimate");
     var revAns = "unknown", revWhy = est ? "Estimated " + bandLabel(est) + " — not confirmed" : "Revenue unknown";
-    if (rev === "lt100k") { revAns = "notyet"; revWhy = "Under $100K — not eligible yet; a Bootcamp prospect that can grow into it"; }
+    if ((rev || est) === "lt100k") { revAns = "notyet"; revWhy = "Under $100K — not eligible yet; a Bootcamp prospect that can grow into it"; }
     else if (rev === "gte25m" || parent === "yes") { revAns = "no"; revWhy = parent === "yes" ? "Parent company at or above $25M" : "$25M or more"; }
     else if (rev) { revAns = parent === "no" ? "yes" : "unknown"; revWhy = bandLabel(rev) + (parent === "no" ? ", no large parent" : "; parent-company revenue not confirmed"); }
     item("revenue", "Revenue $100K to under $25M, parent included", revAns, revWhy);
@@ -722,7 +740,7 @@
     var ti = val(c, "targetIndustry");
     var guess = industryMatch(val(c, "industry"), val(c, "description"));
     item("industry", "JobsOhio target industry",
-      ti || (guess ? "yes" : (val(c, "industry") ? "unknown" : "unknown")),
+      ti || "unknown",
       ti ? "Set by researcher" : guess ? "Looks like " + guess + " — confirm" : "Industry not matched");
 
     var mix = val(c, "customerMix");
@@ -1021,7 +1039,9 @@
     out[AT_COMPANY.discovered] = c.createdAt || null;
     out[AT_COMPANY.verified] = c.verifiedAt || null;
     out[AT_COMPANY.approvedBy] = (c.review && c.review.byName) || "";
-    out[AT_COMPANY.doNotContact] = !!c.doNotContact;
+    /* only ever raise the flag: an opt-out ticked in Airtable must never be
+       cleared by a send from the desk */
+    if (c.doNotContact) out[AT_COMPANY.doNotContact] = true;
     out[AT_COMPANY.lastSynced] = new Date((now || new Date()).getTime()).toISOString();
     var gl = grantLikelihood(c, now);
     out[AT_COMPANY.likelihood] = gl.score;
@@ -1054,7 +1074,7 @@
     out[AT_CONTACT.linkedin] = dnc ? null : (val(ct, "linkedin") || null);
     out[AT_CONTACT.sources] = ["name", "role", "email", "phone", "linkedin"].filter(function (k) { return ct.f[k] && ct.f[k].src; })
       .map(function (k) { return k + ": " + ct.f[k].src + (ct.f[k].at ? " (" + ct.f[k].at + ")" : ""); }).join("\n");
-    out[AT_CONTACT.doNotContact] = dnc;
+    if (dnc) out[AT_CONTACT.doNotContact] = true;
     return out;
   }
 
