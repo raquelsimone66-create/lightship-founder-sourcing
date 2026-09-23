@@ -1,0 +1,31 @@
+<title>Bootcamp Lead Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <h1>Bootcamp Lead Desk</h1>
+      <span class="brand-sub">Lightship · Ohio</span>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Sections"></nav>
+    <div class="top-actions">
+      <button type="button" class="btn primary" data-act="open-import">Add leads</button>
+    </div>
+  </div>
+  <div class="status-strip" id="status"></div>
+</header>
+
+<main id="main">
+  <p class="muted">Loading the desk…</p>
+</main>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheet-title"></aside>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script src="core.js"></script>
+<script src="app.js"></script>
