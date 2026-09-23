@@ -84,7 +84,14 @@
     applyTheme();
   }
 
+  function loadRecipients() {
+    if (!window.fetch) return;
+    fetch("josb-recipients.json").then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (list) { LD.setRecipients(list); schedule(); }).catch(function () { /* list is optional */ });
+  }
+
   function boot() {
+    loadRecipients();
     try { var saved = localStorage.getItem("leaddesk.theme"); if (THEMES.indexOf(saved) >= 0) theme = saved; } catch (e) { /* no storage */ }
     applyTheme();
     COLLS.forEach(function (c) { cache[c] = localLoad(c); });
@@ -341,7 +348,7 @@
       "<span>" + esc(who) + "</span></div>" +
       '<div class="lead-meta">' + reachLine(c) + "</div>" +
       '<div class="lead-meta">' + profileLinks(c) + "</div></div>" +
-      '<div class="lead-tags">' + reviewChip(c) + LD.ownershipOf(c).map(function (id) { var o = LD.OWNERSHIP.filter(function (x) { return x.id === id; })[0]; return '<span class="chip lamp" title="As stated by: ' + esc((c.f.ownerIdentity && c.f.ownerIdentity.src) || "") + '">' + esc(o.label) + "</span>"; }).join("") + fitChip(c) + flagChips(c, ["conflict", "no-contact", "sync-error", "do-not-contact"]) + outreachChip(c) + "</div></li>";
+      '<div class="lead-tags">' + reviewChip(c) + (LD.pastRecipient(c) ? '<span class="chip warn" title="On JobsOhio\'s all-time Small Business Grant recipient list">Past JOSB recipient</span>' : "") + LD.ownershipOf(c).map(function (id) { var o = LD.OWNERSHIP.filter(function (x) { return x.id === id; })[0]; return '<span class="chip lamp" title="As stated by: ' + esc((c.f.ownerIdentity && c.f.ownerIdentity.src) || "") + '">' + esc(o.label) + "</span>"; }).join("") + fitChip(c) + flagChips(c, ["conflict", "no-contact", "sync-error", "do-not-contact"]) + outreachChip(c) + "</div></li>";
   }
 
   /* ============================================================

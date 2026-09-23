@@ -341,4 +341,15 @@ t('ownership comes only from a stated source and maps to the filter', () => {
   assert.deepStrictEqual(LD.ownershipOf(LD.fromRaw({ name: 'N' }, null, NOW).company), []);
 });
 
+t('past grant recipients are flagged on the checklist, matched by name and metro', () => {
+  LD.setRecipients([{ name: 'Acme Tool & Die, LLC', city: 'Parma', region: 'Northeast' }]);
+  const hit = LD.fromRaw({ name: 'Acme Tool and Die', city: 'Cleveland' }, null, NOW).company;
+  const far = LD.fromRaw({ name: 'Acme Tool and Die', city: 'Toledo' }, null, NOW).company;
+  assert.ok(LD.pastRecipient(hit));
+  assert.strictEqual(LD.pastRecipient(far), null);
+  const g = LD.grantPrescreen(hit, NOW);
+  assert.ok(g.items.some(i => i.key === 'prior'));
+  LD.setRecipients([]);
+});
+
 console.log('\n' + n + ' passed');

@@ -12,6 +12,7 @@ You read and write its database with the ArtifactData tool. Load it with ToolSea
 - List the `companies` collection with `out_dir` set to a scratch folder. Build a set of every known domain (`f.domain.v`) and company name (`f.name.v`, plus `aliases`).
 - List the `intake` collection the same way and add its domains and names to that set.
 - Skip any candidate whose domain or name is already known. Don't spend research on a company the desk already has.
+- Also read /home/user/lightship-founder-sourcing/src/josb-recipients.json, JobsOhio's all-time list of Small Business Grant recipients (name, city, region). Don't add a company that is already on it: they've had the grant. Use the list the other way too — it shows the kinds of Ohio businesses JobsOhio funds (small machine, tool and fab shops, design and print firms, construction trades, food producers), so look for similar companies that aren't on it yet.
 
 ## 2. Where to look
 

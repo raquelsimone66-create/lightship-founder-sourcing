@@ -740,6 +740,9 @@
     item("financing", "Can finance spending before reimbursement", fin || "unknown",
       fin ? "Set by researcher" : "Not yet asked");
 
+    var prior = pastRecipient(c);
+    if (prior) items.push({ key: "prior", label: "Not already a grant recipient", answer: "unknown",
+      why: "On JobsOhio's all-time recipient list (" + prior.name + ", " + prior.city + ") — check whether a second award is allowed" });
     var no = items.filter(function (x) { return x.answer === "no"; }).length;
     var yes = items.filter(function (x) { return x.answer === "yes"; }).length;
     var outcome = no ? "Unlikely fit" : yes === items.length ? "Potential referral" : "Needs review";
@@ -862,6 +865,31 @@
     var t = val(c, "ownerIdentity");
     if (!t) return [];
     return OWNERSHIP.filter(function (o) { return o.re.test(t); }).map(function (o) { return o.id; });
+  }
+
+  /* Past JobsOhio Small Business Grant recipients (JobsOhio's all-time list).
+     A match is the same normalised name in the same town or metro. */
+  var recipientIndex = null;
+  function setRecipients(list) {
+    recipientIndex = {};
+    (list || []).forEach(function (r) {
+      var k = normName(r.name);
+      if (!k) return;
+      (recipientIndex[k] = recipientIndex[k] || []).push(r);
+    });
+  }
+  function pastRecipient(c) {
+    if (!recipientIndex) return null;
+    var names = [val(c, "name")].concat(c.aliases || []).map(normName).filter(Boolean);
+    var city = normCity(val(c, "city")), metro = regionOf(city);
+    for (var i = 0; i < names.length; i++) {
+      var hits = recipientIndex[names[i]] || [];
+      for (var j = 0; j < hits.length; j++) {
+        var hc = normCity(hits[j].city);
+        if (!city || hc === city || (metro && regionOf(hc) === metro)) return hits[j];
+      }
+    }
+    return null;
   }
 
   function revenueText(c) {
@@ -1114,7 +1142,7 @@
     isDecisionRole: isDecisionRole, mergeFacts: mergeFacts, mergeCompany: mergeCompany,
     contactMatch: contactMatch, ingest: ingest, suppressed: suppressed, inOutreach: inOutreach,
     scoreBootcamp: scoreBootcamp, grantPrescreen: grantPrescreen, grantLikelihood: grantLikelihood,
-    GRANT_WEIGHTS: GRANT_WEIGHTS, SOCIALS: SOCIALS, normSocial: normSocial, revenueText: revenueText, revenueMatches: revenueMatches, OWNERSHIP: OWNERSHIP, ownershipOf: ownershipOf, socialsOf: socialsOf, reachOf: reachOf, industryMatch: industryMatch,
+    GRANT_WEIGHTS: GRANT_WEIGHTS, SOCIALS: SOCIALS, normSocial: normSocial, revenueText: revenueText, setRecipients: setRecipients, pastRecipient: pastRecipient, revenueMatches: revenueMatches, OWNERSHIP: OWNERSHIP, ownershipOf: ownershipOf, socialsOf: socialsOf, reachOf: reachOf, industryMatch: industryMatch,
     bestContact: bestContact, flags: flags, companyToAirtable: companyToAirtable,
     contactToAirtable: contactToAirtable, outreachFromAirtable: outreachFromAirtable,
     metrics: metrics, weekStart: weekStart, parseCSV: parseCSV, clone: clone
