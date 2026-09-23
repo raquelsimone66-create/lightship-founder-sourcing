@@ -125,6 +125,9 @@ const server = http.createServer((req, res) => {
   const coRows = Object.values(at.tbloCsATWhWShKQqP);
   assert.strictEqual(coRows.length, 1, 'one company row');
   assert.strictEqual(Object.values(at.tblybeD6fmRaHMpzK).length, 1, 'one contact row');
+  const fid = n => 'fld' + (n.replace(/\W/g, '') + 'xxxxxxxxxxxxxx').slice(0, 14);
+  assert.strictEqual(coRows[0].fields[fid('Email')], 'dana@acme-fab.example', 'company email reaches Airtable');
+  assert.strictEqual(Object.values(at.tblybeD6fmRaHMpzK)[0].fields[fid('Email')], 'dana@acme-fab.example', 'contact email reaches Airtable');
 
   /* sending again updates the same row */
   await page.click('[data-act="sync-one"]');
