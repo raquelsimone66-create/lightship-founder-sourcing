@@ -67,7 +67,26 @@
     put("settings", s);
   }
 
+  /* Theme: match system, light or dark. Remembered on this device only. */
+  var THEMES = ["system", "light", "dark"];
+  var THEME_LABEL = { system: "◐ Match system", light: "☀ Light", dark: "☾ Dark" };
+  var theme = "system";
+  function applyTheme() {
+    var root = document.documentElement;
+    if (theme === "system") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme", theme);
+    var b = document.getElementById("btn-theme");
+    if (b) { b.textContent = THEME_LABEL[theme]; b.title = "Theme: " + THEME_LABEL[theme].slice(2) + " — click to change"; }
+  }
+  function cycleTheme() {
+    theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+    try { localStorage.setItem("leaddesk.theme", theme); } catch (e) { /* private window */ }
+    applyTheme();
+  }
+
   function boot() {
+    try { var saved = localStorage.getItem("leaddesk.theme"); if (THEMES.indexOf(saved) >= 0) theme = saved; } catch (e) { /* no storage */ }
+    applyTheme();
     COLLS.forEach(function (c) { cache[c] = localLoad(c); });
     render();
     if (!window.claude || typeof window.claude.use !== "function") return;
@@ -1528,6 +1547,7 @@
     var cid = sheet && sheet.kind === "company" ? sheet.id : null;
 
     switch (act) {
+      case "theme": cycleTheme(); break;
       case "nav": view = d.view; filters.flag = filters.flag && d.view === "companies" ? filters.flag : ""; render(); window.scrollTo(0, 0); break;
       case "open-company": openSheet({ kind: "company", id: d.id }); break;
       case "close": closeSheet(); break;
