@@ -1124,7 +1124,7 @@
     });
   }
 
-  function commitResults(results, source, title) {
+  function commitResults(results, source, title, kind) {
     var counts = { created: 0, merged: 0, suppressed: 0, skipped: 0 };
     var touched = {}, touchedContacts = {};
     results.forEach(function (r) {
@@ -1140,7 +1140,7 @@
     });
     Object.keys(touchedContacts).forEach(function (id) { put("contacts", touchedContacts[id]); });
     if (source) put("sources", Object.assign({}, source, { lastRunAt: LD.today() }));
-    addRun(title, counts.created + " new, " + counts.merged + " merged, " + counts.suppressed + " suppressed, " + counts.skipped + " skipped" + (source ? " · " + source.name : ""), counts, []);
+    addRun(title, counts.created + " new, " + counts.merged + " already known, " + counts.suppressed + " do-not-contact, " + counts.skipped + " skipped" + (source ? " · " + source.name : ""), counts, [], kind);
     return counts;
   }
 
@@ -1148,7 +1148,7 @@
     c.log = (c.log || []).concat([{ at: LD.today(), what: what, by: me.id || null }]).slice(-40);
   }
   function addRun(title, summary, counts, errors, kind) {
-    put("runs", { id: LD.uid("run"), at: new Date().toISOString(), title: title, summary: summary, counts: counts || null, errors: errors || [], by: me.id || null, kind: kind || "" });
+    put("runs", { id: kind === "research" ? LD.stableId("run", title) : LD.uid("run"), at: new Date().toISOString(), title: title, summary: summary, counts: counts || null, errors: errors || [], by: me.id || null, kind: kind || "" });
     /* keep the log from growing without end */
     var runs = cache.runs.slice().sort(function (a, b) { return (a.at || "").localeCompare(b.at || ""); });
     while (runs.length > 200) del("runs", runs.shift().id);
@@ -1432,9 +1432,10 @@
       var usable = bySource[sid].filter(function () { return !src || src.status !== "Paused"; });
       var rows = usable.map(function (it) { return it.raw || it; });
       if (rows.length) {
-        var counts = commitResults(dryRun(rows, src ? srcRef(src) : RESEARCH_SOURCE), src, "Claude's research added");
         var batch = bySource[sid][0] && bySource[sid][0].batch;
-        addRun("Research batch" + (batch ? " " + batch : ""), counts.created + " new companies, " + counts.merged + " already known, " + counts.suppressed + " do-not-contact", counts, [], "research");
+        /* the run id is the batch, so a second view adding the same batch
+           overwrites the log line instead of doubling it */
+        commitResults(dryRun(rows, src ? srcRef(src) : RESEARCH_SOURCE), src, "Research batch" + (batch ? " " + batch : ""), "research");
       }
       bySource[sid].forEach(function (it) { if (usable.indexOf(it) >= 0) del("intake", it.id); });
       if (usable.length < bySource[sid].length && !auto) toast("Some candidates came from a paused source and were left waiting.");
@@ -1583,7 +1584,7 @@
           var merged = LD.clone(dup); LD.mergeFacts(merged, ct); if (ct.decisionMaker) merged.decisionMaker = true;
           merged.updatedAt = LD.today(); put("contacts", merged);
         } else {
-          ct.id = LD.uid("ct"); ct.companyId = cid; ct.createdAt = LD.today(); ct.updatedAt = LD.today();
+          ct.id = LD.stableId("ct", LD.contactKey(cid, ct)); ct.companyId = cid; ct.createdAt = LD.today(); ct.updatedAt = LD.today();
           if (co && co.doNotContact) ct.doNotContact = true;
           put("contacts", ct);
         }
@@ -1630,7 +1631,7 @@
           if (!nct) return;
           var hit = contactsOf(cid).filter(function (x) { return LD.contactMatch(x, nct); })[0];
           if (hit) { var m2 = LD.clone(hit); LD.mergeFacts(m2, nct); m2.updatedAt = LD.today(); put("contacts", m2); }
-          else { nct.id = LD.uid("ct"); nct.companyId = cid; nct.createdAt = LD.today(); nct.updatedAt = LD.today(); put("contacts", nct); }
+          else { nct.id = LD.stableId("ct", LD.contactKey(cid, nct)); nct.companyId = cid; nct.createdAt = LD.today(); nct.updatedAt = LD.today(); put("contacts", nct); }
           took++;
         });
         editing = null; enrich = { status: "idle", result: null, error: "" };

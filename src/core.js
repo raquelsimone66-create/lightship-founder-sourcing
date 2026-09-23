@@ -100,6 +100,29 @@
     for (var i = 0; i < 10; i++) s += chars[Math.floor(Math.random() * chars.length)];
     return prefix + "_" + s;
   }
+  /* The same company must get the same id no matter which view or run
+     creates it, so two people opening the desk at once, or a batch added
+     twice, write one record rather than two. FNV-1a, twice, in base 36. */
+  function stableId(prefix, key) {
+    function fnv(str, seed) {
+      var h = seed >>> 0;
+      for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+      return h;
+    }
+    var k = String(key || "");
+    return prefix + "_" + fnv(k, 2166136261).toString(36) + fnv(k, 3339675911).toString(36);
+  }
+  function companyKey(c) {
+    var d = val(c, "domain");
+    if (d) return "d:" + d;
+    var city = val(c, "city");
+    return "n:" + normName(val(c, "name")) + "|" + (regionOf(city) || String(city || "").toLowerCase());
+  }
+  function contactKey(companyId, ct) {
+    var e = val(ct, "email"), l = val(ct, "linkedin");
+    return companyId + "|" + (e ? "e:" + e : l ? "l:" + l.toLowerCase() : "n:" + normName(val(ct, "name")) + "|" + (val(ct, "phone") || ""));
+  }
+
   function blank(v) { return v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length); }
 
   /* A fact's value, or undefined when the fact is missing or marked unknown. */
@@ -471,7 +494,7 @@
       }
     } else {
       company = incoming;
-      company.id = uid("co");
+      company.id = stableId("co", companyKey(incoming));
       company.createdAt = today(now);
       company.review = { state: sup ? "rejected" : "new", note: sup ? "Suppressed: " + sup : "" };
       action = sup ? "suppressed" : "created";
@@ -492,7 +515,7 @@
         if (cc.some(function (x) { return x.kind !== "filled"; })) merged.changed = today(now);
         return { contact: merged, action: "merged" };
       }
-      ct.id = uid("ct");
+      ct.id = stableId("ct", contactKey(company.id, ct));
       ct.companyId = company.id;
       ct.createdAt = today(now);
       ct.updatedAt = today(now);
@@ -1022,7 +1045,7 @@
     SOURCE_TYPES: SOURCE_TYPES, TRI: TRI, COMPANY_FIELDS: COMPANY_FIELDS,
     CONTACT_STALE_DAYS: CONTACT_STALE_DAYS, PROFILE_STALE_DAYS: PROFILE_STALE_DAYS,
     AT_COMPANY: AT_COMPANY, AT_CONTACT: AT_CONTACT,
-    today: today, iso: iso, daysBetween: daysBetween, uid: uid, val: val, fact: fact, blank: blank,
+    today: today, iso: iso, daysBetween: daysBetween, uid: uid, stableId: stableId, companyKey: companyKey, contactKey: contactKey, val: val, fact: fact, blank: blank,
     normDomain: normDomain, companyDomain: companyDomain, normName: normName, normCity: normCity,
     regionOf: regionOf, normEmail: normEmail, normPhone: normPhone, normLinkedIn: normLinkedIn,
     normRevenue: normRevenue, normMix: normMix, normTri: normTri, bandLabel: bandLabel,

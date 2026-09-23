@@ -287,4 +287,17 @@ t('Airtable export carries the likelihood, revenue estimate and profiles', () =>
   assert.strictEqual(out['Social profiles'], 'Facebook: https://facebook.com/a');
 });
 
+t('the same company added twice, from separate views, gets the same id', () => {
+  const raw = { name: 'Twice Co', website: 'twice.example', city: 'Akron', contactName: 'Pat Lee', email: 'pat@twice.example' };
+  const a = LD.ingest(raw, null, { companies: [], contacts: [] }, NOW);
+  const b = LD.ingest(raw, null, { companies: [], contacts: [] }, NOW);
+  assert.strictEqual(a.company.id, b.company.id);
+  assert.strictEqual(a.contacts[0].contact.id, b.contacts[0].contact.id);
+  const c = LD.ingest({ name: 'Other Co', website: 'other.example' }, null, { companies: [], contacts: [] }, NOW);
+  assert.notStrictEqual(a.company.id, c.company.id);
+  const n1 = LD.ingest({ name: 'No Site Bakery', city: 'Lakewood' }, null, { companies: [], contacts: [] }, NOW);
+  const n2 = LD.ingest({ name: 'No Site Bakery LLC', city: 'Cleveland' }, null, { companies: [], contacts: [] }, NOW);
+  assert.strictEqual(n1.company.id, n2.company.id);
+});
+
 console.log('\n' + n + ' passed');
