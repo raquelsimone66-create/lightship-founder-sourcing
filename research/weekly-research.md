@@ -58,6 +58,7 @@ Visit the company's own site (home, about, team or leadership, contact and caree
 - `companyLinkedin`, `instagram`, `facebook`, `x`, `youtube`, `tiktok`: the company's own public profile URLs, only if you found them.
 - `hiring`, `expansion`, `investment`, `engagement`: one short sentence each, only when a source shows it. For example: "Posting for 2 welders on Indeed, Sep 2026", "Opened a second facility in Stow in 2026", "Buying a new CNC line per Crain's", "Spoke at the Akron Chamber manufacturing summit".
 - `targetIndustry`: "yes" only when the industry is clearly one of the JobsOhio target industries. Otherwise leave it out.
+- **Email and phone for every company (required search):** check the contact page, the site footer and the raw HTML for `mailto:` and `tel:` links, then the company's BBB or chamber listing. Put a general inbox (info@, sales@, office@) in `companyEmail` and the main line in `companyPhone`, and put a named person's own business email in `email` and phone in `phone`. Only use what is published; never construct an address like firstname@domain. If only a contact form exists, say so in `verifyNote`.
 - The owner or decision maker (owner, founder, CEO or president) as `contactName` and `contactRole`, plus business `email`, business `phone` and personal `linkedin` if public. Business contact information only: no home addresses, personal social media or family details.
 - `sourceUrl`: the main page you used. `evidence`: a map from each field name to the exact URL that supports it, whenever that's a different page. Every fact must be traceable.
 - Leave out anything you couldn't find. Unknown is fine, and a guess is not.
@@ -77,6 +78,7 @@ Write each company as one document in the `intake` collection with ArtifactData 
     "revenue": "", "revenueEstimate": "$1M-$5M", "revenueBasis": "",
     "companyLinkedin": "", "instagram": "", "facebook": "", "x": "", "youtube": "", "tiktok": "",
     "hiring": "", "expansion": "", "investment": "", "engagement": "", "targetIndustry": "yes",
+    "companyEmail": "", "companyPhone": "",
     "contactName": "", "contactRole": "", "email": "", "phone": "", "linkedin": "",
     "sourceUrl": "", "evidence": { "hiring": "https://…" }, "verifyNote": ""
   }

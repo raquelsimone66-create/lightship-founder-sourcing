@@ -299,6 +299,13 @@
     if (!list.length) return '<span class="muted">No website or profiles found</span>';
     return '<span class="links">' + list.map(function (x) { return link(x.url, x.label); }).join("") + "</span>";
   }
+  function reachLine(c) {
+    var r = LD.reachOf(c, contactsOf(c.id));
+    var parts = [];
+    parts.push(r.email ? '<span class="mono">' + esc(r.email.v) + "</span>" : '<span class="missing">No email yet</span>');
+    parts.push(r.phone ? '<span class="mono">' + esc(r.phone.v) + "</span>" : '<span class="missing">No phone yet</span>');
+    return parts.join("");
+  }
   function fitChip(c) {
     return '<span class="chip" title="Bootcamp fit — how well they match the program, separate from the grant">Bootcamp fit ' + scoreOf(c).score + "</span>";
   }
@@ -313,6 +320,7 @@
       "<span>" + esc(LD.revenueText(c) || "Revenue unknown") + "</span>" +
       "<span>" + esc(LD.val(c, "city") || "City unknown") + "</span>" +
       "<span>" + esc(who) + "</span></div>" +
+      '<div class="lead-meta">' + reachLine(c) + "</div>" +
       '<div class="lead-meta">' + profileLinks(c) + "</div></div>" +
       '<div class="lead-tags">' + reviewChip(c) + fitChip(c) + flagChips(c, ["conflict", "no-contact", "sync-error", "do-not-contact"]) + outreachChip(c) + "</div></li>";
   }
@@ -436,6 +444,10 @@
     if (f.contact) {
       var ct = LD.bestContact(contactsOf(c.id), NOW());
       var reach = scoreOf(c).parts.reach;
+      var rr = LD.reachOf(c, contactsOf(c.id));
+      if (f.contact === "email" && !rr.email) return false;
+      if (f.contact === "noemail" && rr.email) return false;
+      if (f.contact === "phone" && !rr.phone) return false;
       if (f.contact === "verified" && reach < 15) return false;
       if (f.contact === "any" && !ct) return false;
       if (f.contact === "none" && ct) return false;
@@ -482,7 +494,7 @@
       '<label class="field">Minimum grant likelihood<input type="number" id="f-min" data-filter="minScore" min="0" max="100" step="5" value="' + esc(filters.minScore) + '"></label>' +
       '<label class="field">Customers' + sel("f-mix", "mix", [["", "Any"], ["B2B", "B2B"], ["Mixed", "Mixed"], ["B2C", "B2C"], ["Unknown", "Unknown"]]) + "</label>" +
       '<label class="field">Grant pre-screen' + sel("f-grant", "grant", [["", "Any"], ["Potential referral", "Potential referral"], ["Needs review", "Needs review"], ["Unlikely fit", "Unlikely fit"]]) + "</label>" +
-      '<label class="field">Contact' + sel("f-contact", "contact", [["", "Any"], ["verified", "Verified decision maker"], ["any", "Has a contact"], ["none", "No contact"]]) + "</label>" +
+      '<label class="field">Contact' + sel("f-contact", "contact", [["", "Any"], ["email", "Has an email"], ["noemail", "No email yet"], ["phone", "Has a phone"], ["verified", "Verified decision maker"], ["any", "Has a contact"], ["none", "No contact"]]) + "</label>" +
       '<label class="field">Company age' + sel("f-age", "age", [["", "Any"], ["known", "Evidence found"], ["unknown", "Unknown"]]) + "</label>" +
       '<label class="field">Revenue' + sel("f-rev", "revenue", [["", "Any"], ["unknown", "Unknown"]].concat(LD.REVENUE_BANDS.map(function (b) { return [b.id, b.label]; }))) + "</label>" +
       '<label class="field">Source' + sel("f-src", "source", [["", "Any"]].concat(cache.sources.map(function (s) { return [s.id, s.name]; })).concat(LD.SOURCE_TYPES.map(function (t) { return [t, "Type: " + t]; }))) + "</label>" +
@@ -495,7 +507,7 @@
     html += '<p class="muted small">' + rows.length + " of " + cache.companies.length + " companies" + (rows.length > 300 ? " · showing the top 300 by score" : "") + "</p>";
     if (!rows.length) return html + '<div class="panel empty">No companies match these filters.</div>';
 
-    html += '<div class="table-wrap"><table class="data"><thead><tr><th>Grant likelihood</th><th>Company</th><th>Industry</th><th>Revenue</th><th>City</th><th>Online</th><th>Owner</th><th>Bootcamp fit</th><th>Review</th><th>Outreach</th></tr></thead><tbody>';
+    html += '<div class="table-wrap"><table class="data"><thead><tr><th>Grant likelihood</th><th>Company</th><th>Industry</th><th>Revenue</th><th>City</th><th>Owner</th><th>Email</th><th>Phone</th><th>Online</th><th>Bootcamp fit</th><th>Review</th><th>Outreach</th></tr></thead><tbody>';
     rows.slice(0, 300).forEach(function (c) {
       var g = likeOf(c), s = scoreOf(c);
       var ct = LD.bestContact(contactsOf(c.id), NOW());
@@ -505,8 +517,9 @@
         "<td>" + esc(LD.val(c, "industry") || "—") + "</td>" +
         '<td class="small">' + esc(LD.revenueText(c) || "Unknown") + "</td>" +
         "<td>" + esc(LD.val(c, "city") || "—") + "</td>" +
-        '<td class="small">' + profileLinks(c) + "</td>" +
         '<td class="small">' + (ct ? esc(LD.val(ct, "name") || "—") + (LD.val(ct, "role") ? '<div class="muted">' + esc(LD.val(ct, "role")) + "</div>" : "") : '<span class="muted">Not found</span>') + "</td>" +
+        (function () { var r = LD.reachOf(c, contactsOf(c.id)); return '<td class="small mono">' + (r.email ? esc(r.email.v) + (r.email.who === "Main office" ? '<div class="muted">general inbox</div>' : "") : '<span class="missing">—</span>') + '</td><td class="small mono" style="white-space:nowrap">' + (r.phone ? esc(r.phone.v) : '<span class="missing">—</span>') + "</td>"; })() +
+        '<td class="small">' + profileLinks(c) + "</td>" +
         '<td class="num">' + s.score + "</td>" +
         "<td>" + reviewChip(c) + "</td>" +
         "<td>" + (outreachChip(c) || '<span class="muted small">' + (c.airtable && c.airtable.recordId ? "Not started" : "—") + "</span>") + "</td></tr>";
@@ -706,11 +719,11 @@
     hiring: "Hiring signal", expansion: "Expansion signal", investment: "Planned investment",
     growth: "10% job/payroll growth or at-risk retention", financing: "Can finance before reimbursement",
     targetIndustry: "JobsOhio target industry", engagement: "Engagement signal",
-    revenueEstimate: "Estimated revenue", instagram: "Instagram", facebook: "Facebook", x: "X (Twitter)",
+    revenueEstimate: "Estimated revenue", email: "General email", phone: "Main phone", instagram: "Instagram", facebook: "Facebook", x: "X (Twitter)",
     youtube: "YouTube", tiktok: "TikTok",
     ownerIdentity: "Founder identity (self-reported or public)"
   };
-  var FACT_ORDER = ["name", "website", "domain", "companyLinkedin", "instagram", "facebook", "x", "youtube", "tiktok",
+  var FACT_ORDER = ["name", "email", "phone", "website", "domain", "companyLinkedin", "instagram", "facebook", "x", "youtube", "tiktok",
     "city", "description", "industry", "customerMix", "foundedYear", "employees", "revenueBand", "revenueEstimate", "hiring", "expansion", "engagement", "ownerIdentity"];
   var TRI_FIELDS = ["parentOver25M", "growth", "financing", "targetIndustry"];
 
@@ -1546,6 +1559,8 @@
           if (!sv2) { toast("That isn't a " + FIELD_LABELS[d.field] + " link or handle."); break; }
           val = sv2;
         }
+        if (d.field === "email" && val) { val = LD.normEmail(val); if (!val) { toast("That email doesn't look right."); break; } }
+        if (d.field === "phone" && val) { val = LD.normPhone(val); if (!val) { toast("Enter a 10-digit US phone number."); break; } }
         var basis = v("ed-basis");
         editing = null; saveFact(cid, d.field, val, src);
         if (d.field === "revenueEstimate" && val) mutate(cid, function (c) { if (c.f.revenueEstimate) c.f.revenueEstimate.basis = basis; });

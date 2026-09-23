@@ -308,4 +308,20 @@ t('a research note that doubts the company sends it to Investigate', () => {
   assert.ok(/Research note/.test(b.company.review.note));
 });
 
+t('best email and phone: decision maker first, then a general inbox', () => {
+  const r = LD.ingest({ name: 'Reach Co', website: 'reach.example', companyEmail: 'info@reach.example', companyPhone: '216-555-0100',
+    contacts: [{ name: 'Office Mgr', role: 'Office manager', email: 'office@reach.example' }, { name: 'Pat Owner', role: 'Owner', email: 'pat@reach.example' }] },
+    null, { companies: [], contacts: [] }, NOW);
+  const cts = r.contacts.map(x => x.contact);
+  const reach = LD.reachOf(r.company, cts);
+  assert.strictEqual(reach.email.v, 'pat@reach.example');
+  assert.strictEqual(reach.phone.v, '(216) 555-0100');
+  assert.strictEqual(reach.phone.who, 'Main office');
+  const bare = LD.ingest({ name: 'Inbox Co', website: 'inbox.example', companyEmail: 'hello@inbox.example' }, null, { companies: [], contacts: [] }, NOW);
+  assert.strictEqual(LD.reachOf(bare.company, []).email.v, 'hello@inbox.example');
+  const out = LD.companyToAirtable(Object.assign(r.company, { id: 'co_r' }), cts, {}, NOW);
+  assert.strictEqual(out['Email'], 'pat@reach.example');
+  assert.strictEqual(out['Phone'], '(216) 555-0100');
+});
+
 console.log('\n' + n + ' passed');

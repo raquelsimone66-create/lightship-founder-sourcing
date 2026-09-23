@@ -318,6 +318,9 @@
       });
     }
     if (raw.companyLinkedin) put("companyLinkedin", normLinkedIn(raw.companyLinkedin));
+    /* a general inbox or main line belongs to the company, not a person */
+    put("email", normEmail(raw.companyEmail));
+    put("phone", normPhone(raw.companyPhone));
     SOCIALS.forEach(function (n) { put(n.key, normSocial(raw[n.key], n.key)); });
     /* Most small businesses publish no revenue. An estimate is kept apart
        from a stated figure, always with the reasoning behind it. */
@@ -815,6 +818,25 @@
     };
   }
 
+  /* The best way to reach a company: the decision maker's own business
+     email and phone first, then anyone else's, then a general company inbox
+     or main line. Do-not-contact people are never offered. */
+  function reachOf(c, contacts) {
+    var live = (contacts || []).filter(function (x) { return !x.doNotContact; });
+    live.sort(function (a, b) { return (b.decisionMaker ? 1 : 0) - (a.decisionMaker ? 1 : 0); });
+    function pick(field) {
+      for (var i = 0; i < live.length; i++) {
+        var f = live[i].f && live[i].f[field];
+        if (f && f.v) return { v: f.v, who: val(live[i], "name") || "", role: val(live[i], "role") || "", src: f.src, at: f.at };
+      }
+      var cf = c.f && c.f[field];
+      if (cf && cf.v) return { v: cf.v, who: "Main office", role: "", src: cf.src, at: cf.at };
+      return null;
+    }
+    if (c.doNotContact) return { email: null, phone: null };
+    return { email: pick("email"), phone: pick("phone") };
+  }
+
   function revenueText(c) {
     var r = val(c, "revenueBand");
     if (r) return bandLabel(r);
@@ -866,7 +888,7 @@
     attended: "Attended", doNotContact: "Do not contact", grantReferral: "Grant referral",
     lastSynced: "Last synced", likelihood: "Grant likelihood", likelihoodConfidence: "Grant confidence",
     revenue: "Revenue (est.)", revenueBasis: "Revenue basis", companyLinkedin: "Company LinkedIn",
-    socials: "Social profiles"
+    socials: "Social profiles", email: "Email", phone: "Phone"
   };
   var AT_CONTACT = {
     externalId: "External ID", name: "Name", companyExternalId: "Company External ID", company: "Company",
@@ -912,6 +934,9 @@
     out[AT_COMPANY.revenue] = revenueText(c) || "Unknown";
     out[AT_COMPANY.revenueBasis] = (c.f.revenueEstimate && !val(c, "revenueBand") && c.f.revenueEstimate.basis) || (val(c, "revenueBand") ? "Stated: " + ((c.f.revenueBand && c.f.revenueBand.src) || "") : "");
     out[AT_COMPANY.companyLinkedin] = val(c, "companyLinkedin") || null;
+    var reach = reachOf(c, contacts);
+    out[AT_COMPANY.email] = reach.email ? reach.email.v : null;
+    out[AT_COMPANY.phone] = reach.phone ? reach.phone.v : null;
     out[AT_COMPANY.socials] = socialsOf(c).filter(function (x) { return x.key !== "linkedin"; }).map(function (x) { return x.label + ": " + x.url; }).join("\n");
     return out;
   }
@@ -1062,7 +1087,7 @@
     isDecisionRole: isDecisionRole, mergeFacts: mergeFacts, mergeCompany: mergeCompany,
     contactMatch: contactMatch, ingest: ingest, suppressed: suppressed, inOutreach: inOutreach,
     scoreBootcamp: scoreBootcamp, grantPrescreen: grantPrescreen, grantLikelihood: grantLikelihood,
-    GRANT_WEIGHTS: GRANT_WEIGHTS, SOCIALS: SOCIALS, normSocial: normSocial, revenueText: revenueText, socialsOf: socialsOf, industryMatch: industryMatch,
+    GRANT_WEIGHTS: GRANT_WEIGHTS, SOCIALS: SOCIALS, normSocial: normSocial, revenueText: revenueText, socialsOf: socialsOf, reachOf: reachOf, industryMatch: industryMatch,
     bestContact: bestContact, flags: flags, companyToAirtable: companyToAirtable,
     contactToAirtable: contactToAirtable, outreachFromAirtable: outreachFromAirtable,
     metrics: metrics, weekStart: weekStart, parseCSV: parseCSV, clone: clone
