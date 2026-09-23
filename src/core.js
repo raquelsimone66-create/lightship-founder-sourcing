@@ -726,8 +726,12 @@
       ti ? "Set by researcher" : guess ? "Looks like " + guess + " — confirm" : "Industry not matched");
 
     var mix = val(c, "customerMix");
-    item("b2b", "Primarily B2B revenue", mix === "B2B" ? "yes" : mix === "B2C" ? "no" : "unknown",
-      mix ? mix + " customers" : "Customer mix unknown");
+    /* JobsOhio has funded consumer businesses too (bakeries, a costume shop,
+       a painting studio are on its recipient list), so a consumer mix lowers
+       the odds without ruling the company out. */
+    item("b2b", "Primarily B2B revenue", mix === "B2B" ? "yes" : "unknown",
+      mix === "B2C" ? "Mostly consumer sales — past recipients include consumer businesses, so not ruled out"
+        : mix === "Mixed" ? "Mixed business and consumer customers" : "Customer mix unknown");
 
     var inv = val(c, "investment");
     item("investment", "A concrete eligible investment", inv ? "yes" : "unknown", inv ? clip(inv) : "No planned investment found");
@@ -789,7 +793,7 @@
     else part("industry", 0);
 
     var mix = val(c, "customerMix");
-    part("b2b", mix === "B2B" ? 15 : mix === "Mixed" ? 7 : 0, null, mix === "Mixed");
+    part("b2b", mix === "B2B" ? 15 : mix === "Mixed" ? 9 : mix === "B2C" ? 4 : 0, null, mix === "Mixed" || mix === "B2C");
 
     if (val(c, "investment")) part("investment", 15);
     else if (val(c, "expansion")) part("investment", 7, "Expansion signal: " + clip(val(c, "expansion")) + " — find the specific investment", true);

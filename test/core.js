@@ -165,7 +165,7 @@ t('grant pre-screen: any No is unlikely fit; all Yes is a potential referral; el
   let c = LD.fromRaw(base, null, NOW).company;
   assert.strictEqual(LD.grantPrescreen(c, NOW).outcome, 'Potential referral');
   c = LD.fromRaw(Object.assign({}, base, { customerMix: 'B2C' }), null, NOW).company;
-  assert.strictEqual(LD.grantPrescreen(c, NOW).outcome, 'Unlikely fit');
+  assert.strictEqual(LD.grantPrescreen(c, NOW).outcome, 'Needs review');
   c = LD.fromRaw(Object.assign({}, base, { revenue: '$30M' }), null, NOW).company;
   assert.strictEqual(LD.grantPrescreen(c, NOW).outcome, 'Unlikely fit');
   c = LD.fromRaw(Object.assign({}, base, { financing: '' }), null, NOW).company;
@@ -254,11 +254,20 @@ t('grant likelihood: an estimate and a hiring post earn partial credit, not full
 });
 
 t('grant likelihood: any clear No caps the score', () => {
-  const c = LD.fromRaw({ name: 'Shop', foundedYear: 2015, revenue: '$2M', parentOver25M: 'no', industry: 'Manufacturing',
-    customerMix: 'B2C', investment: 'New storefront', growth: 'yes', financing: 'yes' }, null, NOW).company;
+  const c = LD.fromRaw({ name: 'Big', foundedYear: 2015, revenue: '$40M', industry: 'Manufacturing',
+    customerMix: 'B2B', investment: 'New line', growth: 'yes', financing: 'yes' }, null, NOW).company;
   const g = LD.grantLikelihood(c, NOW);
   assert.ok(g.hardNo);
   assert.ok(g.score <= 15, 'score ' + g.score);
+});
+
+t('grant likelihood: a consumer business gets partial credit, not a cap', () => {
+  const c = LD.fromRaw({ name: 'Bakery', foundedYear: 2015, revenue: '$800K', parentOver25M: 'no', industry: 'Commercial bakery', targetIndustry: 'yes',
+    customerMix: 'B2C', investment: 'New ovens', growth: 'yes', financing: 'yes' }, null, NOW).company;
+  const g = LD.grantLikelihood(c, NOW);
+  assert.ok(!g.hardNo);
+  assert.strictEqual(g.parts.find(p => p.key === 'b2b').points, 4);
+  assert.strictEqual(g.score, 89);
 });
 
 t('social profiles normalise and refuse the wrong platform', () => {

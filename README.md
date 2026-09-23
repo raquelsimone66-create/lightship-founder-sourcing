@@ -89,14 +89,14 @@ below, weighted:
 | Operating at least one year | 10 | Founding year a year or more ago | — |
 | Revenue $100K to under $25M, parent included | 20 | Stated and in range, with no large parent | 16 if stated but the parent isn't confirmed; 12 for an estimate in range |
 | JobsOhio target industry | 20 | Confirmed | 14 when the industry looks like a target industry |
-| Primarily B2B | 15 | B2B | 7 for a mix |
+| Primarily B2B | 15 | B2B | 9 for a mix, 4 for mostly consumer (JobsOhio has funded consumer businesses, so this is never a hard no) |
 | Concrete eligible investment | 15 | A specific planned investment | 7 for an expansion signal |
 | 10% job/payroll growth or at-risk retention | 10 | Confirmed | 6 for a hiring signal, 4 for expansion |
 | Can fund spending before reimbursement | 10 | Confirmed | 3 when revenue is $1M+ |
 
 Unknown earns nothing. Each unknown is listed under *To confirm on a call or by
 research*, and together they set the confidence. Any clear **No**, such as
-mainly consumer sales or revenue over $25M, caps the score at 15, because a
+revenue over $25M or under a year in business, caps the score at 15, because a
 company that fails a hard requirement shouldn't rank on the rest. A company
 like that can still be a Bootcamp prospect.
 
