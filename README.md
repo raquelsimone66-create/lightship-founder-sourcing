@@ -178,9 +178,18 @@ them.
 
 ## The weekly research routine
 
+**Limits in this cloud environment:** Claude gets 200 web searches per session,
+and the network policy blocks opening most web pages, so research works from
+search results and directory listings. Raising the search limit
+(`CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION`) and allowing outbound web access in
+the environment's network settings would give fuller profiles and a full 60–75
+each week. The first batch (Sept 23, 2026) produced 48.
+
 The page can't browse the web itself, so research runs as a scheduled Claude
-routine: *Lightship weekly lead research*, which starts a fresh session every
-Monday at 10:00 UTC. It:
+routine: *Lightship weekly lead research*, every Monday at 10:00 UTC. It wakes
+the Claude Code session that built the desk, because that session can write to
+the desk's database (a freshly started session can't). That session splits the
+research across parallel researchers. It:
 
 - reads the desk's settings and existing companies, so it skips anything known or suppressed
 - researches 60–75 new companies
