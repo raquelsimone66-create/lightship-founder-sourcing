@@ -227,4 +227,64 @@ t('CSV import maps common directory headers', () => {
   assert.strictEqual(rows[0].email, 'dana@acme-fab.com');
 });
 
+t('grant likelihood: strong evidence scores high; unknowns score nothing and are listed', () => {
+  const strong = LD.fromRaw({ name: 'Acme', foundedYear: 2016, revenue: '$2M', parentOver25M: 'no', industry: 'Precision machining', targetIndustry: 'yes',
+    customerMix: 'B2B', investment: 'New CNC line', growth: 'yes', financing: 'yes' }, null, NOW).company;
+  const g = LD.grantLikelihood(strong, NOW);
+  assert.strictEqual(g.score, 100);
+  assert.strictEqual(g.confidence, 'High');
+  const thin = LD.fromRaw({ name: 'Thin Co', city: 'Akron' }, null, NOW).company;
+  const t2 = LD.grantLikelihood(thin, NOW);
+  assert.strictEqual(t2.score, 0);
+  assert.strictEqual(t2.confidence, 'Low');
+  assert.strictEqual(t2.missing.length, 7);
+});
+
+t('grant likelihood: an estimate and a hiring post earn partial credit, not full', () => {
+  const c = LD.fromRaw({ name: 'Est Co', foundedYear: 2018, industry: 'Commercial HVAC services', customerMix: 'B2B',
+    revenueEstimate: '$500K-$1M', revenueBasis: '8 employees on LinkedIn; typical $90K revenue per employee',
+    hiring: 'Two technician openings on Indeed' }, null, NOW).company;
+  const g = LD.grantLikelihood(c, NOW);
+  const rev = g.parts.find(p => p.key === 'revenue');
+  assert.strictEqual(rev.points, 12);
+  assert.ok(/Estimated \$500K–\$1M/.test(rev.why));
+  assert.strictEqual(g.parts.find(p => p.key === 'growth').points, 6);
+  assert.strictEqual(LD.revenueText(c), 'Est. $500K–$1M');
+  assert.strictEqual(LD.grantPrescreen(c, NOW).items.find(i => i.key === 'revenue').answer, 'unknown');
+});
+
+t('grant likelihood: any clear No caps the score', () => {
+  const c = LD.fromRaw({ name: 'Shop', foundedYear: 2015, revenue: '$2M', parentOver25M: 'no', industry: 'Manufacturing',
+    customerMix: 'B2C', investment: 'New storefront', growth: 'yes', financing: 'yes' }, null, NOW).company;
+  const g = LD.grantLikelihood(c, NOW);
+  assert.ok(g.hardNo);
+  assert.ok(g.score <= 15, 'score ' + g.score);
+});
+
+t('social profiles normalise and refuse the wrong platform', () => {
+  assert.strictEqual(LD.normSocial('@acmefab', 'instagram'), 'https://www.instagram.com/acmefab');
+  assert.strictEqual(LD.normSocial('https://twitter.com/acme?ref=x', 'x'), 'https://twitter.com/acme');
+  assert.strictEqual(LD.normSocial('https://facebook.com/acme', 'instagram'), '');
+  const c = LD.fromRaw({ name: 'A', companyLinkedin: 'linkedin.com/company/acme', instagram: '@acme' }, null, NOW).company;
+  assert.deepStrictEqual(LD.socialsOf(c).map(x => x.label), ['LinkedIn', 'Instagram']);
+});
+
+t('each researched fact keeps the page it came from', () => {
+  const c = LD.fromRaw({ name: 'A', industry: 'Logistics', foundedYear: 2012, sourceUrl: 'https://a.example',
+    evidence: { foundedYear: 'https://opencorporates.example/a' } }, null, NOW).company;
+  assert.strictEqual(c.f.industry.src, 'https://a.example');
+  assert.strictEqual(c.f.foundedYear.src, 'https://opencorporates.example/a');
+});
+
+t('Airtable export carries the likelihood, revenue estimate and profiles', () => {
+  const c = LD.fromRaw({ name: 'A', revenueEstimate: '600000', revenueBasis: 'basis', companyLinkedin: 'linkedin.com/company/a', facebook: 'facebook.com/a' }, null, NOW).company;
+  c.id = 'co_x';
+  const out = LD.companyToAirtable(c, [], {}, NOW);
+  assert.strictEqual(typeof out['Grant likelihood'], 'number');
+  assert.strictEqual(out['Revenue (est.)'], 'Est. $500K–$1M');
+  assert.strictEqual(out['Revenue basis'], 'basis');
+  assert.strictEqual(out['Company LinkedIn'], 'https://www.linkedin.com/company/a');
+  assert.strictEqual(out['Social profiles'], 'Facebook: https://facebook.com/a');
+});
+
 console.log('\n' + n + ' passed');

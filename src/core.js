@@ -58,6 +58,8 @@
 
   var REVENUE_BANDS = [
     { id: "lt100k", label: "Under $100K" },
+    { id: "100k-500k", label: "$100K–$500K" },
+    { id: "500k-1m", label: "$500K–$1M" },
     { id: "100k-1m", label: "$100K–$1M" },
     { id: "1m-5m", label: "$1M–$5M" },
     { id: "5m-25m", label: "$5M–$25M" },
@@ -66,7 +68,7 @@
 
   var SOURCE_TYPES = [
     "Business directory", "Chamber of commerce", "Supplier network", "Startup ecosystem",
-    "Accelerator list", "Event roster", "Partner referral", "Company website", "Founder network", "Other"
+    "Accelerator list", "Event roster", "Partner referral", "Company website", "Founder network", "Web research", "Other"
   ];
 
   var TRI = ["yes", "no", "unknown"];
@@ -163,6 +165,29 @@
     return "https://www." + s.replace(/^[a-z]+:\/\//i, "").replace(/^www\./i, "").replace(/[?#].*$/, "").replace(/\/$/, "");
   }
 
+  /* Public social profiles. A handle or a URL goes in; a clean URL comes out,
+     and only for the platform it claims to be. */
+  var SOCIALS = [
+    { key: "instagram", label: "Instagram", host: "instagram.com" },
+    { key: "facebook", label: "Facebook", host: "facebook.com" },
+    { key: "x", label: "X", host: "x.com", alt: "twitter.com" },
+    { key: "youtube", label: "YouTube", host: "youtube.com" },
+    { key: "tiktok", label: "TikTok", host: "tiktok.com" }
+  ];
+  function normSocial(raw, key) {
+    var s = String(raw || "").trim();
+    if (!s) return "";
+    var net = SOCIALS.filter(function (x) { return x.key === key; })[0];
+    if (!net) return "";
+    if (/^@?[A-Za-z0-9._-]{2,40}$/.test(s)) {
+      var h = s.replace(/^@/, "");
+      return "https://www." + net.host + "/" + (key === "tiktok" ? "@" : "") + h;
+    }
+    var d = normDomain(s);
+    if (d !== net.host && d !== net.alt && d.slice(-(net.host.length + 1)) !== "." + net.host) return "";
+    return "https://" + s.replace(/^[a-z]+:\/\//i, "").replace(/[?#].*$/, "").replace(/\/$/, "");
+  }
+
   /* ---------- matching ---------- */
 
   function namesOf(c) {
@@ -199,7 +224,7 @@
   /* ---------- building records from raw input ---------- */
 
   var COMPANY_FIELDS = ["name", "domain", "website", "city", "description", "industry", "customerMix",
-    "foundedYear", "employees", "revenueBand", "parentOver25M", "hiring", "expansion", "investment",
+    "foundedYear", "employees", "revenueBand", "revenueEstimate", "companyLinkedin", "instagram", "facebook", "x", "youtube", "tiktok", "parentOver25M", "hiring", "expansion", "investment",
     "growth", "financing", "targetIndustry", "engagement", "ownerIdentity"];
 
   /* A raw row from CSV, paste, an extraction or a discovery run → a company
@@ -209,7 +234,9 @@
     var src = raw.sourceUrl || (source && source.url) || "";
     var by = raw.by || "auto";
     var c = { f: {}, aliases: [], sources: [], conflicts: [] };
-    function put(field, v) { if (!blank(v)) c.f[field] = fact(v, src, at, by); }
+    /* a researched profile cites a different page for each fact */
+    var ev = raw.evidence || {};
+    function put(field, v) { if (!blank(v)) c.f[field] = fact(v, ev[field] || src, at, by); }
 
     put("name", String(raw.name || "").trim());
     var website = raw.website ? String(raw.website).trim() : "";
@@ -260,6 +287,14 @@
       });
     }
     if (raw.companyLinkedin) put("companyLinkedin", normLinkedIn(raw.companyLinkedin));
+    SOCIALS.forEach(function (n) { put(n.key, normSocial(raw[n.key], n.key)); });
+    /* Most small businesses publish no revenue. An estimate is kept apart
+       from a stated figure, always with the reasoning behind it. */
+    var estBand = normRevenue(raw.revenueEstimate);
+    if (estBand) {
+      c.f.revenueEstimate = fact(estBand, ev.revenueEstimate || src, at, by);
+      c.f.revenueEstimate.basis = String(raw.revenueBasis || "").trim().slice(0, 300);
+    }
     return { company: c, contacts: contacts };
   }
 
@@ -313,7 +348,8 @@
     var n = parseMoney(s);
     if (n === null) return "";
     if (n < 100000) return "lt100k";
-    if (n < 1000000) return "100k-1m";
+    if (n < 500000) return "100k-500k";
+    if (n < 1000000) return "500k-1m";
     if (n < 5000000) return "1m-5m";
     if (n < 25000000) return "5m-25m";
     return "gte25m";
@@ -553,7 +589,7 @@
     } else missing.push("Employees");
 
     /* 3. traction, hiring or expansion — 20 */
-    var hiring = val(c, "hiring"), expansion = val(c, "expansion"), rev = val(c, "revenueBand");
+    var hiring = val(c, "hiring"), expansion = val(c, "expansion"), rev = val(c, "revenueBand") || val(c, "revenueEstimate");
     if (hiring) { parts.traction += 8; reasons.push("Hiring: " + clip(hiring)); }
     if (expansion) { parts.traction += 6; reasons.push("Expansion: " + clip(expansion)); }
     if (ask(!!rev)) {
@@ -634,7 +670,8 @@
       fy ? (year - fy >= 1 ? "yes" : "no") : "unknown", fy ? "Founded " + fy : "Year founded unknown");
 
     var rev = val(c, "revenueBand"), parent = val(c, "parentOver25M");
-    var revAns = "unknown", revWhy = "Revenue unknown";
+    var est = val(c, "revenueEstimate");
+    var revAns = "unknown", revWhy = est ? "Estimated " + bandLabel(est) + " — not confirmed" : "Revenue unknown";
     if (rev === "lt100k") { revAns = "no"; revWhy = "Under $100K"; }
     else if (rev === "gte25m" || parent === "yes") { revAns = "no"; revWhy = parent === "yes" ? "Parent company at or above $25M" : "$25M or more"; }
     else if (rev) { revAns = parent === "no" ? "yes" : "unknown"; revWhy = bandLabel(rev) + (parent === "no" ? ", no large parent" : "; parent-company revenue not confirmed"); }
@@ -667,14 +704,102 @@
     return { outcome: outcome, items: items, yes: yes, no: no, unknown: items.length - yes - no };
   }
 
+  /* How likely we could get this company the grant, 0–100. The same seven
+     criteria as the checklist, weighted, with partial credit for evidence
+     that points the right way but isn't confirmed (an estimated revenue, a
+     hiring post standing in for 10% growth). Any clear No caps the score:
+     a company that fails a hard requirement shouldn't rank on the rest. */
+  var GRANT_WEIGHTS = { age: 10, revenue: 20, industry: 20, b2b: 15, investment: 15, growth: 10, financing: 10 };
+
+  function grantLikelihood(c, now) {
+    var pre = grantPrescreen(c, now);
+    var byKey = {};
+    pre.items.forEach(function (i) { byKey[i.key] = i; });
+    var parts = [], missing = [], evidenced = 0, hardNo = false;
+    function part(key, points, why, known) {
+      var max = GRANT_WEIGHTS[key];
+      var it = byKey[key];
+      if (it.answer === "no") { hardNo = true; points = 0; }
+      if (known || it.answer !== "unknown") evidenced++;
+      else missing.push(it.label);
+      parts.push({ key: key, label: it.label, points: Math.min(max, points), max: max, answer: it.answer, why: why || it.why });
+    }
+
+    part("age", byKey.age.answer === "yes" ? 10 : 0);
+
+    var rev = val(c, "revenueBand"), est = val(c, "revenueEstimate"), parent = val(c, "parentOver25M");
+    var inRange = function (b) { return b && b !== "lt100k" && b !== "gte25m"; };
+    if (byKey.revenue.answer === "yes") part("revenue", 20);
+    else if (inRange(rev)) part("revenue", 16, bandLabel(rev) + " stated; parent company not confirmed", true);
+    else if (inRange(est)) {
+      var basis = c.f.revenueEstimate.basis;
+      part("revenue", 12, "Estimated " + bandLabel(est) + (basis ? " — " + basis : ""), true);
+    } else if (est) part("revenue", 2, "Estimated " + bandLabel(est) + " — likely outside the range", true);
+    else part("revenue", 0);
+
+    var ti = val(c, "targetIndustry");
+    var guess = industryMatch(val(c, "industry"), val(c, "description"));
+    if (ti === "yes") part("industry", 20);
+    else if (!ti && guess) part("industry", 14, "Looks like " + guess + " — confirm", true);
+    else part("industry", 0);
+
+    var mix = val(c, "customerMix");
+    part("b2b", mix === "B2B" ? 15 : mix === "Mixed" ? 7 : 0, null, mix === "Mixed");
+
+    if (val(c, "investment")) part("investment", 15);
+    else if (val(c, "expansion")) part("investment", 7, "Expansion signal: " + clip(val(c, "expansion")) + " — find the specific investment", true);
+    else part("investment", 0);
+
+    var growth = val(c, "growth");
+    if (growth === "yes") part("growth", 10);
+    else if (!growth && val(c, "hiring")) part("growth", 6, "Hiring: " + clip(val(c, "hiring")) + " — confirm it reaches 10%", true);
+    else if (!growth && val(c, "expansion")) part("growth", 4, "Expanding — confirm jobs or payroll grow 10%", true);
+    else part("growth", 0);
+
+    var fin = val(c, "financing");
+    var bigEnough = ["1m-5m", "5m-25m"].indexOf(rev || est) >= 0;
+    if (fin === "yes") part("financing", 10);
+    else if (!fin && bigEnough) part("financing", 3, "Revenue suggests some cash flow — ask", false);
+    else part("financing", 0, "Ask on the first call");
+
+    var score = parts.reduce(function (a, p) { return a + p.points; }, 0);
+    if (hardNo) score = Math.min(score, 15);
+    var ratio = evidenced / parts.length;
+    return {
+      score: score,
+      parts: parts,
+      missing: missing,
+      hardNo: hardNo,
+      outcome: pre.outcome,
+      confidence: ratio >= 0.7 ? "High" : ratio >= 0.4 ? "Medium" : "Low",
+      checklist: pre
+    };
+  }
+
+  function revenueText(c) {
+    var r = val(c, "revenueBand");
+    if (r) return bandLabel(r);
+    var e = val(c, "revenueEstimate");
+    return e ? "Est. " + bandLabel(e) : "";
+  }
+
+  function socialsOf(c) {
+    var out = [];
+    var li = val(c, "companyLinkedin");
+    if (li) out.push({ key: "linkedin", label: "LinkedIn", url: li });
+    SOCIALS.forEach(function (n) { var u = val(c, n.key); if (u) out.push({ key: n.key, label: n.label, url: u }); });
+    return out;
+  }
+
   /* ---------- flags the Today view surfaces ---------- */
 
   function flags(c, contacts, now) {
     var out = [];
     var t = today(now);
     if ((c.conflicts || []).some(function (x) { return !x.resolved; })) out.push("conflict");
-    var verified = c.verifiedAt || "";
-    if (!verified || daysBetween(verified, t) > PROFILE_STALE_DAYS) out.push("stale-profile");
+    /* only an approved profile can go stale; a new one is simply unreviewed */
+    var approved = c.review && c.review.state === "approved";
+    if (approved && (!c.verifiedAt || daysBetween(c.verifiedAt, t) > PROFILE_STALE_DAYS)) out.push("stale-profile");
     var live = (contacts || []).filter(function (x) { return !x.doNotContact; });
     if (!live.length) out.push("no-contact");
     live.forEach(function (ct) {
@@ -700,7 +825,9 @@
     status: "Outreach status", owner: "Outreach owner", firstContact: "First contact date",
     channel: "Channel", followUp: "Next follow-up", replied: "Replied", applied: "Applied",
     attended: "Attended", doNotContact: "Do not contact", grantReferral: "Grant referral",
-    lastSynced: "Last synced"
+    lastSynced: "Last synced", likelihood: "Grant likelihood", likelihoodConfidence: "Grant confidence",
+    revenue: "Revenue (est.)", revenueBasis: "Revenue basis", companyLinkedin: "Company LinkedIn",
+    socials: "Social profiles"
   };
   var AT_CONTACT = {
     externalId: "External ID", name: "Name", companyExternalId: "Company External ID", company: "Company",
@@ -740,6 +867,13 @@
     out[AT_COMPANY.approvedBy] = (c.review && c.review.byName) || "";
     out[AT_COMPANY.doNotContact] = !!c.doNotContact;
     out[AT_COMPANY.lastSynced] = new Date((now || new Date()).getTime()).toISOString();
+    var gl = grantLikelihood(c, now);
+    out[AT_COMPANY.likelihood] = gl.score;
+    out[AT_COMPANY.likelihoodConfidence] = gl.confidence;
+    out[AT_COMPANY.revenue] = revenueText(c) || "Unknown";
+    out[AT_COMPANY.revenueBasis] = (c.f.revenueEstimate && !val(c, "revenueBand") && c.f.revenueEstimate.basis) || (val(c, "revenueBand") ? "Stated: " + ((c.f.revenueBand && c.f.revenueBand.src) || "") : "");
+    out[AT_COMPANY.companyLinkedin] = val(c, "companyLinkedin") || null;
+    out[AT_COMPANY.socials] = socialsOf(c).filter(function (x) { return x.key !== "linkedin"; }).map(function (x) { return x.label + ": " + x.url; }).join("\n");
     return out;
   }
 
@@ -888,7 +1022,8 @@
     matchReason: matchReason, findMatch: findMatch, fromRaw: fromRaw, contactFromRaw: contactFromRaw,
     isDecisionRole: isDecisionRole, mergeFacts: mergeFacts, mergeCompany: mergeCompany,
     contactMatch: contactMatch, ingest: ingest, suppressed: suppressed, inOutreach: inOutreach,
-    scoreBootcamp: scoreBootcamp, grantPrescreen: grantPrescreen, industryMatch: industryMatch,
+    scoreBootcamp: scoreBootcamp, grantPrescreen: grantPrescreen, grantLikelihood: grantLikelihood,
+    GRANT_WEIGHTS: GRANT_WEIGHTS, SOCIALS: SOCIALS, normSocial: normSocial, revenueText: revenueText, socialsOf: socialsOf, industryMatch: industryMatch,
     bestContact: bestContact, flags: flags, companyToAirtable: companyToAirtable,
     contactToAirtable: contactToAirtable, outreachFromAirtable: outreachFromAirtable,
     metrics: metrics, weekStart: weekStart, parseCSV: parseCSV, clone: clone

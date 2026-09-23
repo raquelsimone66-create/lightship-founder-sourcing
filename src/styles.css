@@ -230,6 +230,8 @@ textarea { min-height: 90px; resize: vertical; }
 .lead:hover { background: var(--surface-2); }
 .lead-name { font-weight: 600; }
 .lead-meta { color: var(--ink-3); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 2px 10px; }
+.links { display: inline-flex; flex-wrap: wrap; gap: 2px 10px; }
+.links a { font-size: 12.5px; }
 .lead-tags { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
 @media (max-width: 560px) { .lead { grid-template-columns: 50px minmax(0, 1fr); } .lead-tags { grid-column: 2; justify-content: flex-start; } }
 

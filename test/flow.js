@@ -30,7 +30,7 @@ const server = http.createServer((req, res) => {
   await page.addInitScript(() => {
     /* Airtable, with the shapes list_tables_for_base returned for the real base */
     const F = (names) => names.map((n, i) => ({ id: 'fld' + (n.replace(/\W/g, '') + 'xxxxxxxxxxxxxx').slice(0, 14), name: n }));
-    const CO = F(['External ID', 'Company', 'Domain', 'Website', 'City', 'Region', 'Industry', 'Description', 'Customer mix', 'Bootcamp priority', 'Priority confidence', 'Priority reasons', 'Grant pre-screen', 'Grant checklist', 'Source links', 'Discovered', 'Verified', 'Approved by', 'Outreach status', 'Outreach owner', 'First contact date', 'Channel', 'Next follow-up', 'Replied', 'Applied', 'Attended', 'Do not contact', 'Grant referral', 'Last synced']);
+    const CO = F(['External ID', 'Company', 'Domain', 'Website', 'City', 'Region', 'Industry', 'Description', 'Customer mix', 'Bootcamp priority', 'Priority confidence', 'Priority reasons', 'Grant pre-screen', 'Grant checklist', 'Source links', 'Discovered', 'Verified', 'Approved by', 'Outreach status', 'Outreach owner', 'First contact date', 'Channel', 'Next follow-up', 'Replied', 'Applied', 'Attended', 'Do not contact', 'Grant referral', 'Last synced', 'Grant likelihood', 'Grant confidence', 'Revenue (est.)', 'Revenue basis', 'Company LinkedIn', 'Social profiles']);
     const CT = F(['External ID', 'Name', 'Company External ID', 'Company', 'Role', 'Decision maker', 'Email', 'Email verified', 'Phone', 'Phone verified', 'LinkedIn', 'Sources', 'Do not contact']);
     const tables = { tables: [{ id: 'tbloCsATWhWShKQqP', name: 'Companies', fields: CO }, { id: 'tblybeD6fmRaHMpzK', name: 'Contacts', fields: CT }] };
     const rows = { tbloCsATWhWShKQqP: {}, tblybeD6fmRaHMpzK: {} };
@@ -58,11 +58,32 @@ const server = http.createServer((req, res) => {
         return Promise.reject({ code: 'tool_error', message: 'unexpected ' + tool });
       }
     };
-    window.claude = { use: (name) => Promise.resolve(name === 'mcp' ? mcp : null) };
+    const user = { me: () => Promise.resolve({ id: 'u_pm', name: 'Program Manager', canEdit: true }), profiles: (ids) => Promise.resolve(Object.fromEntries(ids.map(i => [i, { name: 'Program Manager' }]))) };
+    window.claude = { use: (name) => Promise.resolve(name === 'mcp' ? mcp : name === 'user' ? user : null) };
+    /* a research batch waiting from the weekly routine */
+    if (!localStorage.getItem('leaddesk.v1.intake')) localStorage.setItem('leaddesk.v1.intake', JSON.stringify([{ id: 'in1', batch: '2026-09-28', raw: {
+      name: 'Rustbelt Precision Machining', website: 'rustbelt-precision.example', city: 'Akron', industry: 'Precision CNC machining',
+      description: 'Machines aerospace and medical parts for OEMs.', customerMix: 'B2B', foundedYear: 2017, employees: 14,
+      revenueEstimate: '$1M-$5M', revenueBasis: '14 employees on LinkedIn; machine shops average ~$150K revenue per employee',
+      companyLinkedin: 'linkedin.com/company/rustbelt-precision', facebook: 'facebook.com/rustbeltprecision',
+      hiring: 'Hiring two CNC machinists (Indeed, Sep 2026)', expansion: 'Added a second shift in 2026',
+      contactName: 'Jordan Price', contactRole: 'Owner', email: 'jordan@rustbelt-precision.example',
+      sourceUrl: 'https://rustbelt-precision.example/about',
+      evidence: { hiring: 'https://indeed.example/rustbelt', companyLinkedin: 'https://linkedin.com/company/rustbelt-precision' } } }]));
   });
 
   await page.goto('http://127.0.0.1:8098/', { waitUntil: 'networkidle' });
   await page.waitForSelector('.pulse');
+
+  /* local mode never runs the auto-add (it needs the shared desk), so
+     add the waiting research batch the way a person would */
+  await page.click('[data-act="process-intake"]');
+  await page.waitForSelector('.leads .lead');
+  const first = await page.textContent('.leads .lead');
+  assert.ok(/Rustbelt Precision Machining/.test(first) && /Est\. \$1M–\$5M/.test(first) && /LinkedIn/.test(first) && /Facebook/.test(first), 'researched row: ' + first);
+  const like = Number(await page.textContent('.leads .lead .score-n'));
+  assert.ok(like >= 50 && like < 100, 'grant likelihood ' + like);
+  assert.ok(/Research batch/.test(await page.textContent('main')));
 
   /* a source */
   await page.click('[data-act="nav"][data-view="sources"]');
@@ -90,10 +111,10 @@ const server = http.createServer((req, res) => {
   assert.ok(/2 new · 1 already known/.test(preview), 'preview counts: ' + preview.slice(0, 400));
   await page.click('[data-act="imp-commit"]');
   await page.waitForSelector('.leads .lead');
-  assert.strictEqual(await page.locator('.leads .lead').count(), 2);
+  assert.strictEqual(await page.locator('.leads .lead').count(), 3);
 
   /* approve the top lead and send it */
-  await page.click('.leads .lead >> nth=0');
+  await page.click('.leads .lead:has-text("Acme")');
   await page.waitForSelector('[data-act="approve"]');
   const title = await page.textContent('#sheet-title');
   await page.click('[data-act="approve"]');
@@ -143,7 +164,8 @@ const server = http.createServer((req, res) => {
     await page.waitForTimeout(80);
   }
   await page.click('[data-act="nav"][data-view="companies"]');
-  await page.click('table.data tr.click >> nth=0');
+  await page.click('table.data tr.click:has-text("Rustbelt")');
+  assert.ok(/Grant likelihood/.test(await page.textContent('.sheet-body')));
   await page.click('[data-act="edit"][data-field="industry"]');
   await page.fill('#ed-v', 'Precision machining');
   await page.click('[data-act="save-fact"]');

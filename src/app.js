@@ -88,7 +88,7 @@
     window.claude.use("user").then(function (u) {
       if (!u) return;
       user = u;
-      u.me().then(function (m) { me = m; schedule(); });
+      u.me().then(function (m) { me = m; maybeAutoIntake(); schedule(); });
     }).catch(function () {});
   }
 
@@ -96,9 +96,20 @@
   function afterLoad() {
     if (loadedOnce) return;
     loadedOnce = true;
+    maybeAutoIntake();
     /* one quiet read of outreach state per visit, so opt-outs and replies
        made in Airtable are here before anyone reviews */
     if (settings().airtable.baseId) readBack(true);
+  }
+
+  /* Claude's research lands in intake; the first person who can edit and
+     opens the page turns it into companies, through the same dedupe and
+     do-not-contact checks as any import. */
+  var intakeDone = false;
+  function maybeAutoIntake() {
+    if (intakeDone || !loadedOnce || !me || !me.canEdit || !cache.intake.length) return;
+    intakeDone = true;
+    processIntake(true);
   }
 
   var user = null;
@@ -121,7 +132,7 @@
      ============================================================ */
 
   var NOW = function () { return new Date(); };
-  var memo = { tick: 0, score: {}, grant: {} };
+  var memo = { score: {}, grant: {}, like: {} };
   function contactsOf(id) { return cache.contacts.filter(function (c) { return c.companyId === id; }); }
   function scoreOf(c) {
     var k = c.id;
@@ -131,6 +142,10 @@
   function grantOf(c) {
     if (!memo.grant[c.id]) memo.grant[c.id] = LD.grantPrescreen(c, NOW());
     return memo.grant[c.id];
+  }
+  function likeOf(c) {
+    if (!memo.like[c.id]) memo.like[c.id] = LD.grantLikelihood(c, NOW());
+    return memo.like[c.id];
   }
   function flagsOf(c) { return LD.flags(c, contactsOf(c.id), NOW()); }
   function regionOf(c) { return LD.regionOf(LD.val(c, "city")) || LD.val(c, "city") || ""; }
@@ -172,7 +187,7 @@
   }
 
   function render() {
-    memo = { score: {}, grant: {} };
+    memo = { score: {}, grant: {}, like: {} };
     renderTabs();
     renderStatus();
     var main = document.getElementById("main");
@@ -242,8 +257,8 @@
   /* ---------- fragments ---------- */
 
   function scoreCell(c) {
-    var s = scoreOf(c);
-    return '<div class="score" title="Bootcamp priority ' + s.score + " of 100 · " + s.confidence + ' confidence">' +
+    var s = likeOf(c);
+    return '<div class="score" title="Grant likelihood ' + s.score + " of 100 · " + s.confidence + ' confidence">' +
       '<span class="score-n">' + s.score + "</span>" +
       '<span class="score-bar"><i style="width:' + s.score + '%"></i></span>' +
       '<span class="score-c">' + s.confidence + "</span></div>";
@@ -278,16 +293,28 @@
     return '<span class="chip ' + cls + '">' + esc(o.status) + "</span>";
   }
 
+  function profileLinks(c) {
+    var list = LD.socialsOf(c);
+    if (LD.val(c, "website")) list.unshift({ label: "Website", url: LD.val(c, "website") });
+    if (!list.length) return '<span class="muted">No website or profiles found</span>';
+    return '<span class="links">' + list.map(function (x) { return link(x.url, x.label); }).join("") + "</span>";
+  }
+  function fitChip(c) {
+    return '<span class="chip" title="Bootcamp fit — how well they match the program, separate from the grant">Bootcamp fit ' + scoreOf(c).score + "</span>";
+  }
+
   function leadRow(c) {
     var ct = LD.bestContact(contactsOf(c.id), NOW());
     var who = ct ? (LD.val(ct, "name") || "Contact") + (LD.val(ct, "role") ? ", " + LD.val(ct, "role") : "") : "No contact yet";
     return '<li class="lead" data-act="open-company" data-id="' + esc(c.id) + '" tabindex="0">' +
       scoreCell(c) +
       '<div><div class="lead-name">' + esc(LD.val(c, "name") || "Unnamed") + "</div>" +
-      '<div class="lead-meta"><span>' + esc(LD.val(c, "city") || "City unknown") + "</span>" +
-      "<span>" + esc(LD.val(c, "industry") || "Industry unknown") + "</span>" +
-      "<span>" + esc(who) + "</span></div></div>" +
-      '<div class="lead-tags">' + reviewChip(c) + grantChip(c) + flagChips(c, ["conflict", "no-contact", "stale-contact", "sync-error", "do-not-contact"]) + outreachChip(c) + "</div></li>";
+      '<div class="lead-meta"><span>' + esc(LD.val(c, "industry") || "Industry unknown") + "</span>" +
+      "<span>" + esc(LD.revenueText(c) || "Revenue unknown") + "</span>" +
+      "<span>" + esc(LD.val(c, "city") || "City unknown") + "</span>" +
+      "<span>" + esc(who) + "</span></div>" +
+      '<div class="lead-meta">' + profileLinks(c) + "</div></div>" +
+      '<div class="lead-tags">' + reviewChip(c) + fitChip(c) + flagChips(c, ["conflict", "no-contact", "sync-error", "do-not-contact"]) + outreachChip(c) + "</div></li>";
   }
 
   /* ============================================================
@@ -327,10 +354,10 @@
     queue.sort(function (a, b) {
       var pa = isPriority(a) ? 1 : 0, pb = isPriority(b) ? 1 : 0;
       if (pa !== pb) return pb - pa;
-      return scoreOf(b).score - scoreOf(a).score;
+      return likeOf(b).score - likeOf(a).score;
     });
 
-    var html = '<div class="view-head"><div><h2>Today</h2><p>New and refreshed leads to review, what is missing, and anything that failed. Cleveland and Akron come first.</p></div>' +
+    var html = '<div class="view-head"><div><h2>Today</h2><p>Companies Claude found this week, ranked by how likely we could get them the JobsOhio Small Business Grant. Cleveland and Akron come first. Approve the ones worth inviting to Bootcamp.</p></div>' +
       '<div class="row">' + (toSync ? '<button type="button" class="btn" data-act="sync">Send ' + toSync + " to Airtable</button>" : "") +
       '<button type="button" class="btn ghost" data-act="readback">Read outreach from Airtable</button></div></div>';
 
@@ -358,11 +385,13 @@
     }
     html += "</section><aside>";
 
-    if (cache.intake.length) {
-      html += '<div class="section-title"><h3>Discovered</h3></div><div class="panel panel-pad" style="margin-bottom:18px"><p style="margin:0 0 8px">' +
-        cache.intake.length + " candidates arrived from scheduled discovery. Processing checks each against the desk for duplicates and suppressions before it reaches the queue.</p>" +
-        '<button type="button" class="btn primary sm" data-act="process-intake">Process candidates</button></div>';
-    }
+    var lastResearch = cache.runs.filter(function (r) { return r.kind === "research"; }).sort(function (a, b) { return (b.at || "").localeCompare(a.at || ""); })[0];
+    html += '<div class="section-title"><h3>Claude\'s research</h3></div><div class="panel panel-pad" style="margin-bottom:18px">';
+    html += lastResearch ? '<p style="margin:0">Last batch ' + fmtDate(lastResearch.at) + ": " + esc(lastResearch.summary) + "</p>" :
+      '<p style="margin:0">No research batch has arrived yet.</p>';
+    html += '<p class="muted small" style="margin:6px 0 0">Every Monday Claude researches 60–75 Ohio companies online and adds them here, skipping any already on the desk or marked do-not-contact.</p>';
+    if (cache.intake.length) html += '<p style="margin:8px 0 0">' + cache.intake.length + ' researched companies are waiting. <button type="button" class="btn primary sm" data-act="process-intake">Add them now</button></p>';
+    html += "</div>";
 
     var changed = cs.filter(highChange).slice(0, 6);
     if (changed.length) {
@@ -399,7 +428,7 @@
       if (f.review === "refreshed") { if (!(state(c) === "approved" && c.review.refreshed)) return false; }
       else if (state(c) !== f.review) return false;
     }
-    if (f.minScore && scoreOf(c).score < Number(f.minScore)) return false;
+    if (f.minScore && likeOf(c).score < Number(f.minScore)) return false;
     if (f.age === "known" && !LD.val(c, "foundedYear")) return false;
     if (f.age === "unknown" && LD.val(c, "foundedYear")) return false;
     if (f.revenue === "unknown" && LD.val(c, "revenueBand")) return false;
@@ -441,16 +470,16 @@
   function viewCompanies() {
     var regions = {};
     cache.companies.forEach(function (c) { var r = regionOf(c); if (r) regions[r] = 1; });
-    var rows = cache.companies.filter(matchesFilters).sort(function (a, b) { return scoreOf(b).score - scoreOf(a).score; });
+    var rows = cache.companies.filter(matchesFilters).sort(function (a, b) { return likeOf(b).score - likeOf(a).score; });
     var flagLabel = { queue: "In the review queue", changes: "High-priority changes" };
     Object.keys(FLAG_TEXT).forEach(function (k) { flagLabel[k] = FLAG_TEXT[k][1]; });
 
-    var html = '<div class="view-head"><div><h2>Companies</h2><p>Every company the desk knows, with its evidence. Scores recalculate as facts or cohort dates change.</p></div></div>';
+    var html = '<div class="view-head"><div><h2>Companies</h2><p>Every company researched so far, ranked by grant likelihood. Scores recalculate whenever a fact changes.</p></div></div>';
     html += '<div class="filters">' +
       '<label class="field">Search<input type="search" id="f-q" data-filter="q" value="' + esc(filters.q) + '" placeholder="Name, domain, person, industry"></label>' +
       '<label class="field">City' + sel("f-region", "region", [["", "All cities"]].concat(Object.keys(regions).sort().map(function (r) { return [r, r]; }))) + "</label>" +
       '<label class="field">Review' + sel("f-review", "review", [["", "Any"], ["new", "New"], ["refreshed", "Refreshed"], ["investigate", "Investigate"], ["approved", "Approved"], ["rejected", "Rejected"]]) + "</label>" +
-      '<label class="field">Minimum score<input type="number" id="f-min" data-filter="minScore" min="0" max="100" step="5" value="' + esc(filters.minScore) + '"></label>' +
+      '<label class="field">Minimum grant likelihood<input type="number" id="f-min" data-filter="minScore" min="0" max="100" step="5" value="' + esc(filters.minScore) + '"></label>' +
       '<label class="field">Customers' + sel("f-mix", "mix", [["", "Any"], ["B2B", "B2B"], ["Mixed", "Mixed"], ["B2C", "B2C"], ["Unknown", "Unknown"]]) + "</label>" +
       '<label class="field">Grant pre-screen' + sel("f-grant", "grant", [["", "Any"], ["Potential referral", "Potential referral"], ["Needs review", "Needs review"], ["Unlikely fit", "Unlikely fit"]]) + "</label>" +
       '<label class="field">Contact' + sel("f-contact", "contact", [["", "Any"], ["verified", "Verified decision maker"], ["any", "Has a contact"], ["none", "No contact"]]) + "</label>" +
@@ -466,20 +495,21 @@
     html += '<p class="muted small">' + rows.length + " of " + cache.companies.length + " companies" + (rows.length > 300 ? " · showing the top 300 by score" : "") + "</p>";
     if (!rows.length) return html + '<div class="panel empty">No companies match these filters.</div>';
 
-    html += '<div class="table-wrap"><table class="data"><thead><tr><th>Score</th><th>Company</th><th>City</th><th>Customers</th><th>Grant</th><th>Decision maker</th><th>Review</th><th>Outreach</th><th>Verified</th></tr></thead><tbody>';
+    html += '<div class="table-wrap"><table class="data"><thead><tr><th>Grant likelihood</th><th>Company</th><th>Industry</th><th>Revenue</th><th>City</th><th>Online</th><th>Owner</th><th>Bootcamp fit</th><th>Review</th><th>Outreach</th></tr></thead><tbody>';
     rows.slice(0, 300).forEach(function (c) {
-      var s = scoreOf(c);
+      var g = likeOf(c), s = scoreOf(c);
       var ct = LD.bestContact(contactsOf(c.id), NOW());
       html += '<tr class="click" data-act="open-company" data-id="' + esc(c.id) + '">' +
-        '<td class="num"><span class="score-n" style="font-size:15px">' + s.score + '</span> <span class="muted small">' + s.confidence[0] + "</span></td>" +
-        "<td><strong>" + esc(LD.val(c, "name")) + '</strong><div class="muted small">' + esc(LD.val(c, "domain") || "no domain") + "</div></td>" +
+        '<td class="num"><span class="score-n" style="font-size:15px">' + g.score + '</span> <span class="muted small">' + g.confidence[0] + "</span></td>" +
+        "<td><strong>" + esc(LD.val(c, "name")) + "</strong></td>" +
+        "<td>" + esc(LD.val(c, "industry") || "—") + "</td>" +
+        '<td class="small">' + esc(LD.revenueText(c) || "Unknown") + "</td>" +
         "<td>" + esc(LD.val(c, "city") || "—") + "</td>" +
-        "<td>" + esc(LD.val(c, "customerMix") || "Unknown") + "</td>" +
-        "<td>" + grantChip(c) + "</td>" +
-        "<td>" + (ct ? esc(LD.val(ct, "name") || "—") + (s.parts.reach >= 15 ? ' <span class="chip good">Verified</span>' : "") : '<span class="muted">None</span>') + "</td>" +
+        '<td class="small">' + profileLinks(c) + "</td>" +
+        '<td class="small">' + (ct ? esc(LD.val(ct, "name") || "—") + (LD.val(ct, "role") ? '<div class="muted">' + esc(LD.val(ct, "role")) + "</div>" : "") : '<span class="muted">Not found</span>') + "</td>" +
+        '<td class="num">' + s.score + "</td>" +
         "<td>" + reviewChip(c) + "</td>" +
-        "<td>" + (outreachChip(c) || '<span class="muted small">' + (c.airtable && c.airtable.recordId ? "Not started" : "—") + "</span>") + "</td>" +
-        '<td class="small">' + fmtDate(c.verifiedAt) + "</td></tr>";
+        "<td>" + (outreachChip(c) || '<span class="muted small">' + (c.airtable && c.airtable.recordId ? "Not started" : "—") + "</span>") + "</td></tr>";
     });
     html += "</tbody></table></div>";
     return html;
@@ -676,10 +706,12 @@
     hiring: "Hiring signal", expansion: "Expansion signal", investment: "Planned investment",
     growth: "10% job/payroll growth or at-risk retention", financing: "Can finance before reimbursement",
     targetIndustry: "JobsOhio target industry", engagement: "Engagement signal",
+    revenueEstimate: "Estimated revenue", instagram: "Instagram", facebook: "Facebook", x: "X (Twitter)",
+    youtube: "YouTube", tiktok: "TikTok",
     ownerIdentity: "Founder identity (self-reported or public)"
   };
-  var FACT_ORDER = ["name", "website", "domain", "companyLinkedin", "city", "description", "industry", "customerMix",
-    "foundedYear", "employees", "revenueBand", "hiring", "expansion", "engagement", "ownerIdentity"];
+  var FACT_ORDER = ["name", "website", "domain", "companyLinkedin", "instagram", "facebook", "x", "youtube", "tiktok",
+    "city", "description", "industry", "customerMix", "foundedYear", "employees", "revenueBand", "revenueEstimate", "hiring", "expansion", "engagement", "ownerIdentity"];
   var TRI_FIELDS = ["parentOver25M", "growth", "financing", "targetIndustry"];
 
   function openSheet(s) { sheet = s; editing = null; renderSheet(); }
@@ -708,8 +740,9 @@
   function factValue(field, f) {
     if (!f || LD.blank(f.v) || f.v === "unknown") return '<span class="unknown">Unknown</span>';
     var v = f.v;
-    if (field === "website" || field === "companyLinkedin") return link(v);
+    if (field === "website" || field === "companyLinkedin" || ["instagram", "facebook", "x", "youtube", "tiktok"].indexOf(field) >= 0) return link(v);
     if (field === "revenueBand") return esc(LD.bandLabel(v));
+    if (field === "revenueEstimate") return esc(LD.bandLabel(v)) + (f.basis ? '<div class="muted small">Basis: ' + esc(f.basis) + "</div>" : "");
     if (TRI_FIELDS.indexOf(field) >= 0) return esc(v === "yes" ? "Yes" : v === "no" ? "No" : v);
     return esc(v);
   }
@@ -724,10 +757,11 @@
     var v = cur && cur.v !== undefined ? cur.v : "";
     var input;
     if (field === "customerMix") input = '<select id="ed-v">' + ["", "B2B", "Mixed", "B2C", "unknown"].map(function (o) { return opt(o, o || "—", v); }).join("") + "</select>";
-    else if (field === "revenueBand") input = '<select id="ed-v">' + [["", "—"], ["unknown", "Unknown"]].concat(LD.REVENUE_BANDS.map(function (b) { return [b.id, b.label]; })).map(function (o) { return opt(o[0], o[1], v); }).join("") + "</select>";
+    else if (field === "revenueBand" || field === "revenueEstimate") input = '<select id="ed-v">' + [["", "—"], ["unknown", "Unknown"]].concat(LD.REVENUE_BANDS.map(function (b) { return [b.id, b.label]; })).map(function (o) { return opt(o[0], o[1], v); }).join("") + "</select>";
     else if (TRI_FIELDS.indexOf(field) >= 0) input = '<select id="ed-v">' + [["unknown", "Unknown"], ["yes", "Yes"], ["no", "No"]].map(function (o) { return opt(o[0], o[1], v); }).join("") + "</select>";
     else if (field === "description" || field === "hiring" || field === "expansion" || field === "investment" || field === "engagement") input = '<textarea id="ed-v" style="min-height:60px">' + esc(v) + "</textarea>";
     else input = '<input type="' + (field === "foundedYear" || field === "employees" ? "number" : "text") + '" id="ed-v" value="' + esc(v) + '">';
+    if (field === "revenueEstimate") input += '<input type="text" id="ed-basis" placeholder="How you estimated it — e.g. 12 employees on LinkedIn, 2 locations" value="' + esc(cur && cur.basis || "") + '">';
     var needSrc = field === "ownerIdentity";
     return '<div class="inline-edit">' + input +
       '<input type="text" id="ed-src" placeholder="' + (needSrc ? "Where the owner stated this (required)" : "Source URL, or leave blank for your own research") + '" value="' + esc(cur && cur.by === "human" ? cur.src : "") + '">' +
@@ -743,7 +777,7 @@
     var o = c.outreach || {};
 
     var h = '<div class="sheet-head"><div style="flex:1;min-width:0"><h2 id="sheet-title">' + esc(LD.val(c, "name") || "Unnamed") + "</h2>" +
-      '<div class="lead-meta">' + (LD.val(c, "website") ? link(LD.val(c, "website")) : "<span>No website</span>") +
+      '<div class="lead-meta">' + profileLinks(c) + "<span>" + esc(LD.val(c, "industry") || "Industry unknown") + "</span><span>" + esc(LD.revenueText(c) || "Revenue unknown") + "</span>" +
       "<span>" + esc(LD.val(c, "city") || "City unknown") + (regionOf(c) && regionOf(c) !== LD.val(c, "city") ? " · " + esc(regionOf(c)) + " area" : "") + "</span>" +
       (c.aliases && c.aliases.length ? "<span>Also listed as " + esc(c.aliases.join(", ")) + "</span>" : "") + "</div>" +
       '<div class="lead-tags" style="justify-content:flex-start;margin-top:6px">' + reviewChip(c) + grantChip(c) + flagChips(c) + outreachChip(c) + "</div></div>" +
@@ -787,12 +821,23 @@
       h += "</div></div>";
     }
 
+    /* grant likelihood — the main score */
+    var gl = likeOf(c);
+    h += '<div class="block"><h3>Grant likelihood · <span class="mono" style="color:var(--lamp)">' + gl.score + "</span> · " + gl.confidence + " confidence</h3>" +
+      '<div class="panel panel-pad"><div class="breakdown">' + gl.parts.map(function (p) {
+        return '<div class="bd-row"><span>' + esc(p.label) + '</span><span class="bd-track"><i style="width:' + (p.points / p.max * 100) + '%"></i></span><span class="num">' + p.points + "/" + p.max + "</span></div>" +
+          '<div class="muted small" style="margin:-2px 0 4px">' + (p.answer === "no" ? '<strong style="color:var(--attention)">No — </strong>' : "") + esc(p.why) + "</div>";
+      }).join("") + "</div>" +
+      (gl.hardNo ? '<div class="notice alert" style="margin-top:8px">Fails at least one grant requirement, so the score is capped. It can still be a Bootcamp prospect.</div>' : "") +
+      (gl.missing.length ? '<p class="small" style="margin:8px 0 0"><strong>To confirm on a call or by research:</strong> ' + esc(gl.missing.join(" · ")) + "</p>" : "") +
+      "</div></div>";
+
     /* score */
     var P = s.parts;
     function bar(label, v, max) {
       return '<div class="bd-row"><span>' + label + '</span><span class="bd-track"><i style="width:' + (v / max * 100) + '%"></i></span><span class="num">' + v + "/" + max + "</span></div>";
     }
-    h += '<div class="block"><h3>Bootcamp priority · <span class="mono" style="color:var(--lamp)">' + s.score + "</span> · " + s.confidence + " confidence</h3>" +
+    h += '<div class="block"><h3>Bootcamp fit · <span class="mono">' + s.score + "</span> · " + s.confidence + " confidence</h3>" +
       '<div class="panel panel-pad"><div class="breakdown">' +
       bar("Priority city or cohort", P.place, 25) + bar("Relevance and growth need", P.fit, 25) +
       bar("Traction, hiring, expansion", P.traction, 20) + bar("Reachable decision maker", P.reach, 15) + bar("Timeliness and engagement", P.timing, 15) + "</div>";
@@ -850,7 +895,7 @@
     h += "</div>";
 
     /* grant */
-    h += '<div class="block"><h3>JobsOhio grant pre-screen · ' + esc(g.outcome) + "</h3>" +
+    h += '<div class="block"><h3>Grant checklist · ' + esc(g.outcome) + "</h3>" +
       '<div class="panel">' + g.items.map(function (it) {
         var fld = { industry: "targetIndustry", growth: "growth", financing: "financing" }[it.key];
         var ctl = "";
@@ -935,6 +980,8 @@
     "- Never infer race, ethnicity, gender or any identity from names, photos or wording. Include ownerIdentity only if the text itself states it (for example 'certified woman-owned business' or the owner describing themself), and quote it.\n" +
     "- customerMix is one of B2B, B2C, Mixed. revenueBand is one of lt100k, 100k-1m, 1m-5m, 5m-25m, gte25m. foundedYear is a 4-digit year. employees is a whole number.\n" +
     "- hiring, expansion, investment and engagement are one short sentence each describing the stated signal.\n" +
+    "- revenueBand only when the text states revenue. revenueEstimate is a band estimated from stated signals (employees, locations, contracts); put the reasoning in quote.\n" +
+    "- instagram, facebook, x, youtube, tiktok are the company's own public profile URLs, only if the text links them.\n" +
     "- description is one plain sentence of what the company does, in your words, no marketing language.\n";
 
   function sampleHandle() {
@@ -951,7 +998,8 @@
   }
 
   var ENRICH_FIELDS = ["description", "industry", "customerMix", "foundedYear", "employees", "revenueBand", "city",
-    "website", "companyLinkedin", "hiring", "expansion", "investment", "engagement", "ownerIdentity"];
+    "website", "companyLinkedin", "instagram", "facebook", "x", "youtube", "tiktok", "revenueEstimate",
+    "hiring", "expansion", "investment", "engagement", "ownerIdentity"];
 
   function runEnrich(c, url, text) {
     enrich = { status: "busy", result: null, error: "" };
@@ -970,7 +1018,8 @@
       }).map(function (f) {
         var v = f.value;
         if (f.field === "customerMix") v = LD.normMix(v);
-        if (f.field === "revenueBand") v = LD.normRevenue(v);
+        if (f.field === "revenueBand" || f.field === "revenueEstimate") v = LD.normRevenue(v);
+        if (["instagram", "facebook", "x", "youtube", "tiktok"].indexOf(f.field) >= 0) v = LD.normSocial(v, f.field);
         if (f.field === "foundedYear" || f.field === "employees") v = Number(String(v).replace(/\D/g, "")) || "";
         return { field: f.field, value: v, quote: String(f.quote || "").slice(0, 240) };
       }).filter(function (f) { return !LD.blank(f.value); });
@@ -1098,8 +1147,8 @@
   function logTo(c, what) {
     c.log = (c.log || []).concat([{ at: LD.today(), what: what, by: me.id || null }]).slice(-40);
   }
-  function addRun(title, summary, counts, errors) {
-    put("runs", { id: LD.uid("run"), at: new Date().toISOString(), title: title, summary: summary, counts: counts || null, errors: errors || [], by: me.id || null });
+  function addRun(title, summary, counts, errors, kind) {
+    put("runs", { id: LD.uid("run"), at: new Date().toISOString(), title: title, summary: summary, counts: counts || null, errors: errors || [], by: me.id || null, kind: kind || "" });
     /* keep the log from growing without end */
     var runs = cache.runs.slice().sort(function (a, b) { return (a.at || "").localeCompare(b.at || ""); });
     while (runs.length > 200) del("runs", runs.shift().id);
@@ -1371,18 +1420,24 @@
      Intake from scheduled discovery
      ============================================================ */
 
-  function processIntake() {
+  var RESEARCH_SOURCE = { id: "", url: "", label: "Claude weekly research", type: "Web research", city: "", network: false };
+
+  function processIntake(auto) {
     var items = cache.intake.slice();
     if (!items.length) return;
     var bySource = {};
     items.forEach(function (it) { (bySource[it.sourceId || ""] = bySource[it.sourceId || ""] || []).push(it); });
     Object.keys(bySource).forEach(function (sid) {
       var src = sid ? find("sources", sid) : null;
-      var usable = bySource[sid].filter(function () { return !src || src.status === "Approved"; });
+      var usable = bySource[sid].filter(function () { return !src || src.status !== "Paused"; });
       var rows = usable.map(function (it) { return it.raw || it; });
-      if (rows.length) commitResults(dryRun(rows, src ? srcRef(src) : null), src, "Processed discovered candidates");
+      if (rows.length) {
+        var counts = commitResults(dryRun(rows, src ? srcRef(src) : RESEARCH_SOURCE), src, "Claude's research added");
+        var batch = bySource[sid][0] && bySource[sid][0].batch;
+        addRun("Research batch" + (batch ? " " + batch : ""), counts.created + " new companies, " + counts.merged + " already known, " + counts.suppressed + " do-not-contact", counts, [], "research");
+      }
       bySource[sid].forEach(function (it) { if (usable.indexOf(it) >= 0) del("intake", it.id); });
-      if (usable.length < bySource[sid].length) toast("Some candidates came from a source that isn't approved and were left waiting.");
+      if (usable.length < bySource[sid].length && !auto) toast("Some candidates came from a paused source and were left waiting.");
     });
   }
   function srcRef(s) { return { id: s.id, url: s.url, label: s.name, type: s.type, city: s.city === "Ohio" ? "" : s.city, network: !!s.network }; }
@@ -1485,7 +1540,14 @@
         var val = v("ed-v"), src = v("ed-src");
         if (d.field === "ownerIdentity" && val && !src) { toast("Add where the owner stated this. Identity is never recorded without a source."); break; }
         if (d.field === "foundedYear" || d.field === "employees") val = val === "" ? "" : Number(val);
+        if (["instagram", "facebook", "x", "youtube", "tiktok"].indexOf(d.field) >= 0 && val) {
+          var sv2 = LD.normSocial(val, d.field);
+          if (!sv2) { toast("That isn't a " + FIELD_LABELS[d.field] + " link or handle."); break; }
+          val = sv2;
+        }
+        var basis = v("ed-basis");
         editing = null; saveFact(cid, d.field, val, src);
+        if (d.field === "revenueEstimate" && val) mutate(cid, function (c) { if (c.f.revenueEstimate) c.f.revenueEstimate.basis = basis; });
         break;
       case "tri": saveFact(cid, d.field, d.v === "unknown" ? "" : d.v, "Researcher"); break;
       case "resolve":
@@ -1553,7 +1615,11 @@
           var inc = { f: {} };
           r.facts.forEach(function (f, i) {
             var box = document.getElementById("en-f" + i);
-            if (box && box.checked) { inc.f[f.field] = LD.fact(f.value, r.url, LD.today(), "auto"); took++; }
+            if (box && box.checked) {
+              inc.f[f.field] = LD.fact(f.value, r.url, LD.today(), "auto");
+              if (f.field === "revenueEstimate") inc.f[f.field].basis = f.quote;
+              took++;
+            }
           });
           LD.mergeFacts(c, inc);
         }, "Added facts from " + r.url);

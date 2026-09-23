@@ -1,85 +1,106 @@
 # Bootcamp Lead Desk
 
-Lightship's sourcing tool for Bootcamp outreach. It finds Ohio companies, builds
-sourced profiles, scores Bootcamp priority and a separate JobsOhio grant
-pre-screen, queues each lead for a researcher, and sends approved leads to
-Airtable. Airtable keeps the team's outreach record. The desk handles discovery,
-refresh, research and scoring.
+Lightship's research dashboard for Bootcamp outreach. Every week Claude
+researches Ohio companies on the public web. For each one it records industry,
+revenue (stated, or an estimate with its reasoning), LinkedIn and social
+profiles, the owner, and evidence for each JobsOhio Small Business Grant
+criterion. The dashboard ranks them by **how likely we could get them the grant**.
+The program manager reviews the list, approves the companies worth inviting to
+Lightship Bootcamp, and sends them to Airtable, where the team runs outreach.
 
 **Live page:** https://claude.ai/artifact/85tSue8PchZ7vjzPuTzYqg (private until shared)
 **Airtable:** base *Lightship Bootcamp Outreach* (`appn70ywOXUf5kjTv`), tables
 *Companies* and *Contacts*.
+**Weekly research:** Claude routine *Lightship weekly lead research*, Mondays
+6am Eastern. It researches 60–75 companies a run, about 250–300 a month. Its
+instructions are in [`research/weekly-research.md`](research/weekly-research.md).
 
-The goal it serves: 300–500 distinct companies first-contacted each month
-(75–125 a week). Cleveland and Akron come first, then Dayton, Columbus,
-Cincinnati, Toledo, Youngstown and Athens/Marietta.
+Cleveland and Akron come first. Dayton, Columbus, Cincinnati, Toledo,
+Youngstown and Athens/Marietta follow as cohort dates are confirmed.
 
 ---
 
-## How a lead moves
+## How a company reaches the program manager
 
 ```
-approved source ─► Add leads ─► dedupe + suppression check ─► Review queue
-                                                              │
-                         researcher approves, edits, rejects, or sends to investigate
-                                                              │
-                                        Send to Airtable (upsert on External ID)
-                                                              │
-                     team does outreach in Airtable ◄─ desk reads status, replies, opt-outs back
+Monday: Claude researches 60–75 companies ─► intake ─► dashboard adds them (dedupe + do-not-contact check)
+                                                                   │
+                                  ranked by grant likelihood on Today, Cleveland/Akron first
+                                                                   │
+                     program manager approves, edits, rejects or marks investigate
+                                                                   │
+                                       Send to Airtable (upsert on External ID)
+                                                                   │
+                team does outreach in Airtable ◄─ dashboard reads status, replies and opt-outs back
 ```
 
-1. **Discover.** Leads come only from a source marked **Approved** on the
-   Sources page. Each source records its link, city, type and access rules, so
-   nobody scrapes a site that asks not to be scraped. You can add leads three ways:
-   paste a table (CSV or copied from a spreadsheet), paste page text and have
-   Claude list the businesses it names, or enter one company by hand. Every fact
-   keeps the source link and the date it was found.
-2. **Enrich.** Open a company and use **Research with Claude**. Paste text from a
-   page you opened (About page, listing, LinkedIn company page, news story) with
-   its link. Claude proposes only what that text says, quoting it. You tick what to
-   keep. Anything not found stays **Unknown**.
-3. **Deduplicate.** A match on domain always counts. A match on normalized name
-   ("The Acme Fabrication, LLC" = "Acme Fabrication") counts only when the cities
-   are in the same metro or one is unknown. Duplicates merge into one profile.
-   Other names become aliases, every source is kept, and contacts merge on
-   email, LinkedIn or name.
-4. **Score.** Both scores are recalculated whenever the desk displays them, so
-   they change as soon as the evidence or cohort dates do. See *Scoring* below.
-5. **Review.** New leads, leads with new evidence, and leads marked investigate
-   show up on **Today**. Cleveland and Akron are listed first. A researcher can
-   approve, reject (a reason is required), investigate, edit facts, resolve
-   conflicts, or override the score (a reason is required and the computed score
-   stays visible).
-6. **Sync.** Only approved companies can be sent. The desk upserts on
-   `External ID`, so sending again or retrying after a failure updates the same
-   row and never creates a duplicate. A failed batch marks only its own rows,
-   records the error, and shows under **Sync failures**.
-7. **Read back.** On each visit, and whenever you click **Read outreach from
-   Airtable**, the desk pulls in status, owner, first-contact date, channel,
-   follow-up, replies, applications, attendance, grant referral and opt-outs.
-   Opted-out companies, and companies the team added to Airtable directly, go on
-   the do-not-contact list. A source that lists them again cannot put them back
-   in the queue.
+1. **Research.** The weekly routine searches public sources: chamber
+   directories, certified MBE/FBE/SBE vendor lists, business news, accelerator
+   portfolios, job boards, procurement awards and company websites. For every
+   company it records the page each fact came from. Anything it can't find is
+   left out rather than guessed. When revenue isn't published, it gives an
+   estimated range with its basis, such as employee count × typical revenue per
+   employee, clearly labeled *Est.* It never infers anyone's identity.
+2. **Arrive.** When someone with edit access opens the page, waiting research
+   is added automatically, through the same duplicate and do-not-contact checks
+   as a manual import. A company the desk already has is merged, not added
+   twice.
+3. **Review.** **Today** lists new companies by grant likelihood. Each row
+   shows industry, revenue, city, owner and links to the website, LinkedIn and
+   social profiles. Opening a company shows the score for each grant criterion
+   and what still needs confirming on a call. The program manager can approve,
+   reject (a reason is required), investigate, edit facts, or override the
+   Bootcamp fit score.
+4. **Manual additions.** You can still add companies yourself with
+   **Add leads**: paste a table, paste a page for Claude to extract, or enter one
+   company. **Research with Claude** on any company fills in more facts from a
+   page you paste.
+5. **Sync.** Only approved companies can be sent. The desk upserts on
+   `External ID`, so a retry never creates a duplicate row.
+6. **Read back.** Outreach status, owner, first contact, replies,
+   applications, attendance, grant referral and opt-outs come back from
+   Airtable. Opted-out companies, and companies the team added straight into
+   Airtable, go on the do-not-contact list, and research skips them.
 
 ### What the desk writes to Airtable, and what it never writes
 
-It writes research fields: company, domain, website, city, region, industry,
-description, customer mix, priority, confidence, reasons, grant pre-screen,
-checklist, source links, discovered and verified dates, approver, and the
-do-not-contact flag.
+It writes research fields:
+
+- company, domain, website, company LinkedIn, social profiles, city, region, industry, description, customer mix
+- grant likelihood and confidence, the grant checklist, estimated revenue and its basis
+- Bootcamp fit and its reasons
+- source links, discovered and verified dates, approver, and the do-not-contact flag
 
 It never writes outreach status, owner, first-contact date, channel, follow-up,
-replied, applied, attended or grant referral. Those fields belong to the team
-and are only read.
-
-A do-not-contact person keeps their Airtable row so they are never rediscovered.
-Their email, phone and LinkedIn are cleared.
+replied, applied, attended or grant referral. Those belong to the team.
 
 ---
 
 ## Scoring
 
-### Bootcamp outreach priority, 0–100
+### Grant likelihood, 0–100: the main ranking
+
+This is how likely we could get the company a JobsOhio Small Business Grant,
+based on what we found online. It uses the same seven criteria as the checklist
+below, weighted:
+
+| Criterion | Points | Full points | Partial credit |
+|---|---|---|---|
+| Operating at least one year | 10 | Founding year a year or more ago | — |
+| Revenue $100K to under $25M, parent included | 20 | Stated and in range, with no large parent | 16 if stated but the parent isn't confirmed; 12 for an estimate in range |
+| JobsOhio target industry | 20 | Confirmed | 14 when the industry looks like a target industry |
+| Primarily B2B | 15 | B2B | 7 for a mix |
+| Concrete eligible investment | 15 | A specific planned investment | 7 for an expansion signal |
+| 10% job/payroll growth or at-risk retention | 10 | Confirmed | 6 for a hiring signal, 4 for expansion |
+| Can fund spending before reimbursement | 10 | Confirmed | 3 when revenue is $1M+ |
+
+Unknown earns nothing. Each unknown is listed under *To confirm on a call or by
+research*, and together they set the confidence. Any clear **No**, such as
+mainly consumer sales or revenue over $25M, caps the score at 15, because a
+company that fails a hard requirement shouldn't rank on the rest. A company
+like that can still be a Bootcamp prospect.
+
+### Bootcamp fit, 0–100: the second score
 
 This ranks where to spend attention. It does not decide admission.
 
@@ -87,7 +108,7 @@ This ranks where to spend attention. It does not decide admission.
 |---|---|---|
 | Priority city or upcoming cohort | 25 | Cleveland/Akron (or any city in Settings → Priority cities), or a confirmed cohort in that city within 90 days. A later cohort earns 18, an expansion city 10, elsewhere in Ohio 5 |
 | Relevance and growth need | 25 | A description, customer mix (B2B scores highest), 1–10 years operating, 2–100 employees |
-| Traction, hiring or expansion | 20 | A hiring signal, an expansion signal, revenue evidence |
+| Traction, hiring or expansion | 20 | A hiring signal, an expansion signal, stated or estimated revenue |
 | Verified reachable decision maker | 15 | Owner/founder/CEO with an email or phone verified in the last 180 days. Stale or indirect contact earns less |
 | Timeliness and engagement | 15 | Evidence found or refreshed in the last 30 days, a partner referral or event/accelerator source, an engagement signal |
 
@@ -96,7 +117,7 @@ lowers confidence (High ≥ 75% of facts known, Medium ≥ 45%, otherwise Low). 
 never treated as evidence against the company. Suburbs count toward their cohort
 city, so Lakewood counts as Cleveland and Cuyahoga Falls as Akron.
 
-### JobsOhio grant pre-screen
+### Grant checklist (Yes / No / Unknown)
 
 This is a separate Yes / No / Unknown checklist:
 
@@ -142,7 +163,7 @@ the replaced value is kept as a conflict until a researcher confirms one.
 
 | Entity | Held as |
 |---|---|
-| **Company** `companies/{co_…}` | stable ID; `f.name`, `f.domain`, `f.website`, `f.companyLinkedin`, `f.city`, `f.description`, `f.industry`, `f.customerMix`, `f.foundedYear`, `f.employees`, `f.revenueBand`, `f.parentOver25M`, `f.hiring`, `f.expansion`, `f.investment`, `f.growth`, `f.financing`, `f.targetIndustry`, `f.engagement`, `f.ownerIdentity`; `aliases`; `sources[]` (url, label, type, sourceId, network, date); `conflicts[]`; `override`; `createdAt`, `updatedAt`, `verifiedAt`; `doNotContact`; `log[]` |
+| **Company** `companies/{co_…}` | stable ID; `f.name`, `f.domain`, `f.website`, `f.companyLinkedin`, `f.instagram`, `f.facebook`, `f.x`, `f.youtube`, `f.tiktok`, `f.revenueEstimate` (with `basis`), `f.city`, `f.description`, `f.industry`, `f.customerMix`, `f.foundedYear`, `f.employees`, `f.revenueBand`, `f.parentOver25M`, `f.hiring`, `f.expansion`, `f.investment`, `f.growth`, `f.financing`, `f.targetIndustry`, `f.engagement`, `f.ownerIdentity`; `aliases`; `sources[]` (url, label, type, sourceId, network, date); `conflicts[]`; `override`; `createdAt`, `updatedAt`, `verifiedAt`; `doNotContact`; `log[]` |
 | **Contact** `contacts/{ct_…}` | stable ID; `companyId`; `f.name`, `f.role`, `f.email`, `f.phone`, `f.linkedin`, each with its own source and verified date; `decisionMaker`; `doNotContact`; `changed` |
 | **Workflow** (on the company) | `review` {state, by, at, note, refreshed}; `airtable` {recordId, status, syncedAt, firstSyncedAt, error, attempts}; `snapshot` {score at last sync}; `outreach` {status, owner, firstContactAt, channel, followUp, replied, applied, attended, optedOut, grantReferral}, read from Airtable |
 | **Source** `sources/{src_…}` | name, url, type, city, status (Proposed / Approved / Paused), access rules, founder-network flag, lastRunAt |
@@ -155,39 +176,23 @@ them.
 
 ---
 
-## Scheduled discovery and refresh
+## The weekly research routine
 
-The page can't browse the web, so recurring discovery runs outside it, as a
-scheduled Claude routine. The routine writes raw candidates into the artifact's
-`intake` collection. The page then runs each candidate through the same dedupe
-and suppression checks as a manual import, and only after that does it reach the
-review queue.
+The page can't browse the web itself, so research runs as a scheduled Claude
+routine: *Lightship weekly lead research*, which starts a fresh session every
+Monday at 10:00 UTC. It:
 
-The routine should write each candidate like this:
+- reads the desk's settings and existing companies, so it skips anything known or suppressed
+- researches 60–75 new companies
+- writes each one as a document in the artifact's `intake` collection
 
-```json
-{
-  "sourceId": "src_bounce",
-  "at": "2026-09-30",
-  "raw": {
-    "name": "Example Co", "website": "example.com", "city": "Akron",
-    "description": "…", "industry": "…",
-    "contactName": "…", "contactRole": "Founder", "email": "…",
-    "hiring": "Posted two technician roles on 2026-09-28",
-    "sourceUrl": "https://the-exact-page-it-came-from"
-  }
-}
-```
+The full instructions, including the exact document shape, are in
+[`research/weekly-research.md`](research/weekly-research.md). To change them,
+edit that file and update the routine's prompt to match. You can see and run
+the routine from claude.ai's routines list.
 
-Rules for the routine:
-
-- Use only sources whose status is **Approved**, and follow each source's access
-  rules.
-- Put the exact page in `sourceUrl`.
-- Leave out anything you can't source.
-- Never infer identity.
-
-The page will not process a candidate whose source isn't approved.
+The page adds waiting research automatically the next time someone who can edit
+opens it. It never processes candidates tagged with a paused source.
 
 ---
 
@@ -197,7 +202,7 @@ The page will not process a candidate whose source isn't approved.
   review, and sync. Check the first 50–100 profiles by hand for location, contact
   accuracy, source quality and duplicates before scaling up. The Performance page
   shows the duplicate and manual-correction rates for that check.
-- **Phase 2: operating loop.** Schedule the discovery/refresh routine above.
+- **Phase 2: operating loop.** The weekly research routine is running.
   Two-way status sync, stale-data flags and source performance are already built.
   Target 75–125 unique first contacts a week.
 - **Phase 3: expand.** Add source packs for the other cities as Bootcamp dates
