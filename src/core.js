@@ -34,18 +34,18 @@
     "brooklyn": "Cleveland", "brooklyn heights": "Cleveland", "north royalton": "Cleveland",
     "berea": "Cleveland", "wickliffe": "Cleveland", "eastlake": "Cleveland", "highland heights": "Cleveland",
     "mayfield heights": "Cleveland", "mayfield": "Cleveland", "mayfield village": "Cleveland", "oakwood village": "Cleveland", "twinsburg": "Cleveland", "aurora": "Akron", "macedonia": "Cleveland",
-    "walton hills": "Cleveland", "seven hills": "Cleveland", "garfield hts": "Cleveland",
+    "walton hills": "Cleveland", chardon: "Cleveland", "north ridgeville": "Cleveland", grafton: "Cleveland", "valley city": "Cleveland", "highland hills": "Cleveland", "seven hills": "Cleveland", "garfield hts": "Cleveland",
     akron: "Akron", "cuyahoga falls": "Akron", barberton: "Akron", stow: "Akron", kent: "Akron",
     hudson: "Akron", fairlawn: "Akron", "green": "Akron", tallmadge: "Akron", canton: "Akron",
     streetsboro: "Akron", ravenna: "Akron", "north canton": "Akron", massillon: "Akron", norton: "Akron",
-    "copley": "Akron", "munroe falls": "Akron", "mogadore": "Akron", "wadsworth": "Akron", medina: "Akron",
-    dayton: "Dayton", kettering: "Dayton", beavercreek: "Dayton", huber: "Dayton", "huber heights": "Dayton",
+    "copley": "Akron", "munroe falls": "Akron", "mogadore": "Akron", "wadsworth": "Akron", medina: "Akron", garrettsville: "Akron", mantua: "Akron", wooster: "Akron",
+    dayton: "Dayton", kettering: "Dayton", oakwood: "Dayton", beavercreek: "Dayton", huber: "Dayton", "huber heights": "Dayton",
     columbus: "Columbus", dublin: "Columbus", westerville: "Columbus", worthington: "Columbus",
     "grove city": "Columbus", hilliard: "Columbus", gahanna: "Columbus", reynoldsburg: "Columbus",
     cincinnati: "Cincinnati", norwood: "Cincinnati", "blue ash": "Cincinnati", mason: "Cincinnati",
     "west chester": "Cincinnati", covington: "Cincinnati", fairfield: "Cincinnati",
-    toledo: "Toledo", "bowling green": "Toledo", perrysburg: "Toledo", maumee: "Toledo", sylvania: "Toledo",
-    youngstown: "Youngstown", warren: "Youngstown", boardman: "Youngstown", austintown: "Youngstown",
+    toledo: "Toledo", "bowling green": "Toledo", pioneer: "Toledo", perrysburg: "Toledo", maumee: "Toledo", sylvania: "Toledo",
+    youngstown: "Youngstown", warren: "Youngstown", "north benton": "Youngstown", salem: "Youngstown", boardman: "Youngstown", austintown: "Youngstown",
     athens: "Athens/Marietta", marietta: "Athens/Marietta", nelsonville: "Athens/Marietta"
   };
 
